@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:posture_app/storage.dart' as ls;
+import 'package:posture_app/ui/modern_background.dart';
 import '../pages/notification_settings_page.dart';
 import '../pages/privacy_settings_page.dart';
 import '../routes.dart';
@@ -54,27 +55,33 @@ class _AccountTabState extends State<AccountTab> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(title: const Text("Hesabım")),
-      body: SafeArea(
-        child: loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Card(
-                    child: Padding(
+      body: ModernBackground(
+        child: SafeArea(
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                  children: [
+                    Container(
                       padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF8A5B), Color(0xFF3D6DFF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
                       child: Row(
                         children: [
                           CircleAvatar(
-                            radius: 28,
-                            backgroundColor: cs.primary.withAlpha(31),
-                            child: Icon(
+                            radius: 30,
+                            backgroundColor: Colors.white.withAlpha(36),
+                            child: const Icon(
                               Icons.person_outline,
-                              color: cs.primary,
+                              color: Colors.white,
                               size: 30,
                             ),
                           ),
@@ -88,19 +95,27 @@ class _AccountTabState extends State<AccountTab> {
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w900,
+                                    color: Colors.white,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   (user?["email"] ?? "-") as String,
-                                  style: TextStyle(color: Colors.grey.shade600),
+                                  style: const TextStyle(
+                                    color: Color(0xE6FFFFFF),
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 8),
                                 Wrap(
                                   spacing: 8,
+                                  runSpacing: 6,
                                   children: [
-                                    _Chip(text: "Yaş: ${user?["age"] ?? "-"}"),
-                                    _Chip(
+                                    _InfoChip(
+                                      icon: Icons.cake_outlined,
+                                      text: "Yaş: ${user?["age"] ?? "-"}",
+                                    ),
+                                    _InfoChip(
+                                      icon: Icons.wc_outlined,
                                       text:
                                           "Cinsiyet: ${user?["gender"] ?? "-"}",
                                     ),
@@ -114,60 +129,67 @@ class _AccountTabState extends State<AccountTab> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                    "Profil düzenleme eklenebilir.",
+                                    "Profil düzenleme yakında eklenecek.",
                                   ),
                                 ),
                               );
                             },
-                            icon: const Icon(Icons.edit_outlined),
+                            icon: const Icon(
+                              Icons.edit_outlined,
+                              color: Colors.white,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    "Ayarlar",
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
+                    const SizedBox(height: 14),
+                    Text(
+                      "Ayarlar",
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  _SettingsTile(
-                    icon: Icons.notifications_outlined,
-                    title: "Bildirimler",
-                    subtitle: "Uyarı ve hatırlatmaları yönet",
-                    onTap: _openNotificationSettings,
-                  ),
-                  _SettingsTile(
-                    icon: Icons.privacy_tip_outlined,
-                    title: "Gizlilik",
-                    subtitle: "Veri ve izinler",
-                    onTap: _openPrivacySettings,
-                  ),
-                  _SettingsTile(
-                    icon: Icons.bluetooth_outlined,
-                    title: "Cihaz Bağlantısı",
-                    subtitle: "Bluetooth cihazlarını yönet",
-                    onTap: widget.onOpenDeviceTab,
-                  ),
-                  _SettingsTile(
-                    icon: Icons.help_outline,
-                    title: "Yardım",
-                    subtitle: "SSS ve destek",
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
+                    const SizedBox(height: 8),
+                    _SettingsTile(
+                      icon: Icons.notifications_outlined,
+                      title: "Bildirimler",
+                      subtitle: "Uyarı ve hatırlatmaları yönet",
+                      color: const Color(0xFFFF8A5B),
+                      onTap: _openNotificationSettings,
                     ),
-                    onPressed: _logout,
-                    icon: const Icon(Icons.logout),
-                    label: const Text("Çıkış Yap"),
-                  ),
-                ],
-              ),
+                    _SettingsTile(
+                      icon: Icons.privacy_tip_outlined,
+                      title: "Gizlilik",
+                      subtitle: "Veri ve izinler",
+                      color: const Color(0xFF3D6DFF),
+                      onTap: _openPrivacySettings,
+                    ),
+                    _SettingsTile(
+                      icon: Icons.bluetooth_outlined,
+                      title: "Cihaz Bağlantısı",
+                      subtitle: "Bluetooth cihazlarını yönet",
+                      color: const Color(0xFF15B88E),
+                      onTap: widget.onOpenDeviceTab,
+                    ),
+                    _SettingsTile(
+                      icon: Icons.help_outline,
+                      title: "Yardım",
+                      subtitle: "SSS ve destek",
+                      color: const Color(0xFF0E7A80),
+                      onTap: () {},
+                    ),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFD84E4E),
+                      ),
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout),
+                      label: const Text("Çıkış Yap"),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -177,38 +199,75 @@ class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final Color color;
   final VoidCallback onTap;
 
   const _SettingsTile({
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Card(
+        child: ListTile(
+          leading: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withAlpha(26),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: Text(subtitle),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: onTap,
+        ),
       ),
     );
   }
 }
 
-class _Chip extends StatelessWidget {
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
   final String text;
-  const _Chip({required this.text});
+
+  const _InfoChip({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      label: Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
-      visualDensity: VisualDensity.compact,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(44),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withAlpha(80)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 15),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:posture_app/storage.dart' as ls;
+import 'package:posture_app/ui/modern_background.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
@@ -45,42 +46,63 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Bildirimler")),
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Card(
-                    child: SwitchListTile.adaptive(
-                      key: const Key("notify_posture_alerts"),
-                      value: _postureAlerts,
-                      onChanged: _setPostureAlerts,
-                      title: const Text(
-                        "Postür Uyarıları",
-                        style: TextStyle(fontWeight: FontWeight.w800),
+      body: ModernBackground(
+        child: SafeArea(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF8A5B), Color(0xFF3D6DFF)],
+                        ),
+                        borderRadius: BorderRadius.circular(22),
                       ),
-                      subtitle: const Text(
-                        "Kamburluk algılandığında anlık uyarı gönder.",
-                      ),
-                    ),
-                  ),
-                  Card(
-                    child: SwitchListTile.adaptive(
-                      key: const Key("notify_daily_reminder"),
-                      value: _dailyReminder,
-                      onChanged: _setDailyReminder,
-                      title: const Text(
-                        "Günlük Hatırlatma",
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      subtitle: const Text(
-                        "Gün sonunda kısa postür özeti gönder.",
+                      child: const Text(
+                        "Bildirim tercihlerini kişiselleştir",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 12),
+                    Card(
+                      child: SwitchListTile.adaptive(
+                        key: const Key("notify_posture_alerts"),
+                        value: _postureAlerts,
+                        onChanged: _setPostureAlerts,
+                        title: const Text(
+                          "Postür Uyarıları",
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: const Text(
+                          "Kamburluk algılandığında anlık uyarı gönder.",
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Card(
+                      child: SwitchListTile.adaptive(
+                        key: const Key("notify_daily_reminder"),
+                        value: _dailyReminder,
+                        onChanged: _setDailyReminder,
+                        title: const Text(
+                          "Günlük Hatırlatma",
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: const Text(
+                          "Gün sonunda kısa postür özeti gönder.",
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }

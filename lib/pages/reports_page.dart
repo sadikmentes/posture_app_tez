@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:posture_app/ui/modern_background.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -7,7 +8,8 @@ class ReportsPage extends StatefulWidget {
   State<ReportsPage> createState() => _ReportsPageState();
 }
 
-class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStateMixin {
+class _ReportsPageState extends State<ReportsPage>
+    with SingleTickerProviderStateMixin {
   late final TabController _tab;
 
   @override
@@ -38,52 +40,54 @@ class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStat
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tab,
-        children: [
-          _ReportView(
-            periodTitle: "Bugün (Günlük)",
-            summary: const _ReportSummary(
-              trackingMinutes: 155,
-              badPostureMinutes: 38,
-              breaksCount: 6,
-              exerciseMinutes: 8,
-              postureScore: 72,
+      body: ModernBackground(
+        child: TabBarView(
+          controller: _tab,
+          children: [
+            _ReportView(
+              periodTitle: "Bugün (Günlük)",
+              summary: const _ReportSummary(
+                trackingMinutes: 155,
+                badPostureMinutes: 38,
+                breaksCount: 6,
+                exerciseMinutes: 8,
+                postureScore: 72,
+              ),
+              trendTitle: "Saatlik Dağılım",
+              bars: const [20, 35, 50, 40, 30, 60, 45, 25],
+              highlight: "En çok kötü postür: 14:00 - 16:00",
+              color: cs.primary,
             ),
-            trendTitle: "Saatlik Dağılım (örnek)",
-            bars: const [20, 35, 50, 40, 30, 60, 45, 25],
-            highlight: "En çok kötü postür: 14:00 - 16:00 arası",
-            color: cs.primary,
-          ),
-          _ReportView(
-            periodTitle: "Son 7 Gün (Haftalık)",
-            summary: const _ReportSummary(
-              trackingMinutes: 980,
-              badPostureMinutes: 210,
-              breaksCount: 29,
-              exerciseMinutes: 42,
-              postureScore: 68,
+            _ReportView(
+              periodTitle: "Son 7 Gün (Haftalık)",
+              summary: const _ReportSummary(
+                trackingMinutes: 980,
+                badPostureMinutes: 210,
+                breaksCount: 29,
+                exerciseMinutes: 42,
+                postureScore: 68,
+              ),
+              trendTitle: "Günlere Göre Skor",
+              bars: const [62, 70, 66, 71, 60, 73, 68],
+              highlight: "En iyi gün: Cumartesi • En zayıf gün: Perşembe",
+              color: cs.tertiary,
             ),
-            trendTitle: "Günlere Göre Skor (örnek)",
-            bars: const [62, 70, 66, 71, 60, 73, 68],
-            highlight: "En iyi gün: Cumartesi • En zayıf gün: Perşembe",
-            color: cs.primary,
-          ),
-          _ReportView(
-            periodTitle: "Son 30 Gün (Aylık)",
-            summary: const _ReportSummary(
-              trackingMinutes: 4100,
-              badPostureMinutes: 940,
-              breaksCount: 120,
-              exerciseMinutes: 190,
-              postureScore: 64,
+            _ReportView(
+              periodTitle: "Son 30 Gün (Aylık)",
+              summary: const _ReportSummary(
+                trackingMinutes: 4100,
+                badPostureMinutes: 940,
+                breaksCount: 120,
+                exerciseMinutes: 190,
+                postureScore: 64,
+              ),
+              trendTitle: "Haftalara Göre Skor",
+              bars: const [58, 63, 66, 64],
+              highlight: "Egzersiz süresi arttıkça skor yükseliyor.",
+              color: cs.secondary,
             ),
-            trendTitle: "Haftalara Göre Skor (örnek)",
-            bars: const [58, 63, 66, 64],
-            highlight: "Egzersiz süresi arttıkça skor yükseliyor (trend)",
-            color: cs.primary,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -93,7 +97,7 @@ class _ReportView extends StatelessWidget {
   final String periodTitle;
   final _ReportSummary summary;
   final String trendTitle;
-  final List<int> bars; // 0..100 gibi düşün
+  final List<int> bars;
   final String highlight;
   final Color color;
 
@@ -113,37 +117,47 @@ class _ReportView extends StatelessWidget {
         : (summary.badPostureMinutes / summary.trackingMinutes).clamp(0.0, 1.0);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(Icons.assessment_outlined, color: color),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    periodTitle,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [color, color.withAlpha(190)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.assessment_outlined, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  periodTitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
                   ),
                 ),
-                _ScoreChip(score: summary.postureScore),
-              ],
-            ),
+              ),
+              _ScoreChip(score: summary.postureScore),
+            ],
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // Özet metrikler
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text("Özet", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                const Text(
+                  "Özet",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 10),
                 _kv("Takip süresi", "${summary.trackingMinutes} dk"),
                 const SizedBox(height: 8),
@@ -153,44 +167,50 @@ class _ReportView extends StatelessWidget {
                 const SizedBox(height: 8),
                 _kv("Egzersiz", "${summary.exerciseMinutes} dk"),
                 const SizedBox(height: 12),
-                Text("Kötü postür oranı: %${(badRatio * 100).toStringAsFixed(0)}"),
+                Text(
+                  "Kötü postür oranı: %${(badRatio * 100).toStringAsFixed(0)}",
+                ),
                 const SizedBox(height: 6),
-                LinearProgressIndicator(value: badRatio),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: badRatio,
+                    minHeight: 10,
+                  ),
+                ),
               ],
             ),
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // Basit bar görünümü (grafik yerine sade)
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(trendTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                Text(
+                  trendTitle,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 for (final v in bars) ...[
                   _BarRow(value: v),
                   const SizedBox(height: 8),
                 ],
                 const SizedBox(height: 6),
-                Text(highlight, style: TextStyle(color: Colors.grey.shade700)),
+                Text(
+                  highlight,
+                  style: TextStyle(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(170),
+                  ),
+                ),
               ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              "Yakında: PDF/Paylaş • Detay filtreleri • Ham veri dışa aktarım",
-              style: TextStyle(color: Colors.grey.shade700),
             ),
           ),
         ),
@@ -201,7 +221,9 @@ class _ReportView extends StatelessWidget {
   Widget _kv(String k, String v) {
     return Row(
       children: [
-        Expanded(child: Text(k, style: TextStyle(color: Colors.grey.shade700))),
+        Expanded(
+          child: Text(k, style: TextStyle(color: Colors.grey.shade700)),
+        ),
         Text(v, style: const TextStyle(fontWeight: FontWeight.w900)),
       ],
     );
@@ -209,7 +231,7 @@ class _ReportView extends StatelessWidget {
 }
 
 class _BarRow extends StatelessWidget {
-  final int value; // 0..100
+  final int value;
   const _BarRow({required this.value});
 
   @override
@@ -217,9 +239,15 @@ class _BarRow extends StatelessWidget {
     final v = (value.clamp(0, 100)) / 100.0;
     return Row(
       children: [
-        SizedBox(width: 38, child: Text("$value", style: const TextStyle(fontWeight: FontWeight.w800))),
+        SizedBox(
+          width: 38,
+          child: Text(
+            "$value",
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
         const SizedBox(width: 10),
-        Expanded(child: LinearProgressIndicator(value: v)),
+        Expanded(child: LinearProgressIndicator(value: v, minHeight: 8)),
       ],
     );
   }
@@ -232,14 +260,20 @@ class _ScoreChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = score.clamp(0, 100);
-    final text = "Skor $s";
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.grey.shade400),
+        color: Colors.white.withAlpha(36),
+        border: Border.all(color: Colors.white.withAlpha(70)),
       ),
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.w900)),
+      child: Text(
+        "Skor $s",
+        style: const TextStyle(
+          fontWeight: FontWeight.w900,
+          color: Colors.white,
+        ),
+      ),
     );
   }
 }

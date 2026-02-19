@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:posture_app/ui/modern_background.dart';
 
 enum BodyRegion { neck, upperBack, back, lowBack, shoulder }
 
@@ -17,67 +18,76 @@ class _ExercisePageState extends State<ExercisePage> {
     final items = _exercisesFor(selected);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Egzersiz"),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      "Bölge Seç",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _chip(BodyRegion.neck, "Boyun"),
-                        _chip(BodyRegion.shoulder, "Omuz"),
-                        _chip(BodyRegion.upperBack, "Sırt Üst"),
-                        _chip(BodyRegion.back, "Sırt"),
-                        _chip(BodyRegion.lowBack, "Bel"),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "Not: Ağrı artarsa bırak. Uyuşma/kuvvet kaybı/şiddetli ağrı varsa hekim-fizyoterapist.",
-                      style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
-                    ),
-                  ],
+      appBar: AppBar(title: const Text("Egzersiz")),
+      body: ModernBackground(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        "Bölge Seç",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _chip(BodyRegion.neck, "Boyun"),
+                          _chip(BodyRegion.shoulder, "Omuz"),
+                          _chip(BodyRegion.upperBack, "Sırt Üst"),
+                          _chip(BodyRegion.back, "Sırt"),
+                          _chip(BodyRegion.lowBack, "Bel"),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        "Not: Ağrı artarsa bırak. Uyuşma/kuvvet kaybı/şiddetli ağrı varsa hekim-fizyoterapist.",
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-            Text(
-              "Önerilen Egzersizler (${items.length})",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-
-            for (final ex in items) _ExerciseCard(ex: ex),
-
-            const SizedBox(height: 12),
-
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  "Yakında: Video ekleme • Program oluşturma (7 günlük) • Hatırlatıcılar",
-                  style: TextStyle(color: Colors.grey.shade700),
+              Text(
+                "Önerilen Egzersizler (${items.length})",
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+
+              for (final ex in items) _ExerciseCard(ex: ex),
+
+              const SizedBox(height: 12),
+
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    "Yakında: Video ekleme • Program oluşturma (7 günlük) • Hatırlatıcılar",
+                    style: TextStyle(color: Colors.grey.shade700),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -139,7 +149,10 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                 Expanded(
                   child: Text(
                     ex.title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -158,7 +171,10 @@ class _ExerciseCardState extends State<_ExerciseCard> {
             ),
             if (expanded) ...[
               const SizedBox(height: 12),
-              const Text("Uygulama", style: TextStyle(fontWeight: FontWeight.w900)),
+              const Text(
+                "Uygulama",
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
               const SizedBox(height: 6),
               for (final s in ex.steps)
                 Padding(
@@ -166,13 +182,19 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("• ", style: TextStyle(fontWeight: FontWeight.w900)),
+                      const Text(
+                        "• ",
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
                       Expanded(child: Text(s)),
                     ],
                   ),
                 ),
               const SizedBox(height: 8),
-              const Text("İpuçları", style: TextStyle(fontWeight: FontWeight.w900)),
+              const Text(
+                "İpuçları",
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
               const SizedBox(height: 6),
               for (final t in ex.tips)
                 Padding(
@@ -180,7 +202,10 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("✓ ", style: TextStyle(fontWeight: FontWeight.w900)),
+                      const Text(
+                        "✓ ",
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
                       Expanded(child: Text(t)),
                     ],
                   ),
@@ -192,7 +217,10 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text("Dikkat: ${ex.caution}", style: const TextStyle(fontSize: 12)),
+                child: Text(
+                  "Dikkat: ${ex.caution}",
+                  style: const TextStyle(fontSize: 12),
+                ),
               ),
             ],
           ],
@@ -207,7 +235,13 @@ class _ExerciseCardState extends State<_ExerciseCard> {
       children: [
         Icon(icon, size: 16, color: Colors.grey.shade700),
         const SizedBox(width: 6),
-        Text(text, style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w700)),
+        Text(
+          text,
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ],
     );
   }
@@ -245,10 +279,7 @@ List<Exercise> _exercisesFor(BodyRegion r) {
             "20 sn tut, diğer tarafa geç.",
             "2 tur yap.",
           ],
-          tips: [
-            "Omzu yukarı çekme.",
-            "Nefesini tutma.",
-          ],
+          tips: ["Omzu yukarı çekme.", "Nefesini tutma."],
           caution: "Baş dönmesi/uyuşma olursa bırak.",
         ),
       ];
@@ -263,9 +294,7 @@ List<Exercise> _exercisesFor(BodyRegion r) {
             "Omuzları yukarı-al, geriye-çek, aşağı indir (daire).",
             "10 tekrar, sonra yön değiştir 10 tekrar.",
           ],
-          tips: [
-            "Yavaş yap, boynu sıkma.",
-          ],
+          tips: ["Yavaş yap, boynu sıkma."],
           caution: "Omuzda batıcı ağrı olursa dur.",
         ),
         Exercise(
@@ -277,9 +306,7 @@ List<Exercise> _exercisesFor(BodyRegion r) {
             "Kolları 'W' pozisyonu yap, sonra yukarı-aşağı kaydır.",
             "8-10 tekrar.",
           ],
-          tips: [
-            "Kaburgaları dışarı fırlatma, karın hafif aktif.",
-          ],
+          tips: ["Kaburgaları dışarı fırlatma, karın hafif aktif."],
           caution: "Omuz sıkışması artarsa aralığı küçült.",
         ),
       ];
@@ -309,9 +336,7 @@ List<Exercise> _exercisesFor(BodyRegion r) {
             "Kapı eşiğinde ön kolunu dayayıp göğsünü nazikçe öne al.",
             "20 sn tut. 2 tur.",
           ],
-          tips: [
-            "Omuz eklemini zorlamadan hafif ger.",
-          ],
+          tips: ["Omuz eklemini zorlamadan hafif ger."],
           caution: "Omuz önünde ağrı artarsa bırak.",
         ),
       ];
@@ -326,9 +351,7 @@ List<Exercise> _exercisesFor(BodyRegion r) {
             "Sandalye sırtına orta sırtını dayayıp göğsü yukarı kaldır.",
             "2 sn tut, gevşe. 10 tekrar.",
           ],
-          tips: [
-            "Boynu geriye atma; hareket orta sırttan.",
-          ],
+          tips: ["Boynu geriye atma; hareket orta sırttan."],
           caution: "Sırt ağrısı artarsa aralığı küçült.",
         ),
         Exercise(
@@ -340,9 +363,7 @@ List<Exercise> _exercisesFor(BodyRegion r) {
             "Sırtı yuvarla (kedi), sonra göğsü aç (inek).",
             "10-12 tekrar.",
           ],
-          tips: [
-            "Hareketi nefesle senkron yap.",
-          ],
+          tips: ["Hareketi nefesle senkron yap."],
           caution: "Bel ağrısı artarsa dur.",
         ),
       ];
@@ -358,9 +379,7 @@ List<Exercise> _exercisesFor(BodyRegion r) {
             "Bel boşluğunu hafifçe yere bastır (pelvisi geriye al).",
             "5 sn tut, bırak. 10 tekrar.",
           ],
-          tips: [
-            "Nefes vererek yap, karın hafif aktif.",
-          ],
+          tips: ["Nefes vererek yap, karın hafif aktif."],
           caution: "Belde keskin ağrı olursa dur.",
         ),
         Exercise(
@@ -371,9 +390,7 @@ List<Exercise> _exercisesFor(BodyRegion r) {
             "Sırtüstü yat, bir dizi göğse çek.",
             "20 sn tut, değiştir. 2 tur.",
           ],
-          tips: [
-            "Beli zorlamadan nazikçe.",
-          ],
+          tips: ["Beli zorlamadan nazikçe."],
           caution: "Kalçaya vuran ağrı olursa bırak.",
         ),
       ];
