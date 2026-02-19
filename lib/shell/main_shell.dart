@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../tabs/home_tab.dart';
-
 import '../tabs/status_tab.dart';
 import '../tabs/account_tab.dart';
 import '../device/device_page.dart';
@@ -17,8 +16,12 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = const [HomeTab(), DevicePage(), StatusTab(), AccountTab()];
-
+    final pages = [
+      const HomeTab(),
+      const DevicePage(),
+      const StatusTab(),
+      AccountTab(onOpenDeviceTab: () => setState(() => idx = 1)),
+    ];
 
     return Scaffold(
       body: pages[idx],
@@ -28,8 +31,14 @@ class _MainShellState extends State<MainShell> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: "Ana"),
           NavigationDestination(icon: Icon(Icons.bluetooth), label: "Cihazım"),
-          NavigationDestination(icon: Icon(Icons.insights_outlined), label: "Durumum"),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: "Hesabım"),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            label: "Durumum",
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            label: "Hesabım",
+          ),
         ],
       ),
     );
