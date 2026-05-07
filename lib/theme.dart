@@ -21,25 +21,29 @@ ThemeData buildTheme() {
     outlineVariant: AppPalette.border,
   );
 
-  final textTheme = GoogleFonts.spaceGroteskTextTheme().copyWith(
-    headlineSmall: const TextStyle(
+  final baseTextTheme = GoogleFonts.notoSansTextTheme();
+  final textTheme = baseTextTheme.copyWith(
+    headlineSmall: baseTextTheme.headlineSmall?.copyWith(
       fontSize: 28,
       height: 1.15,
       fontWeight: FontWeight.w700,
     ),
-    titleLarge: const TextStyle(
+    titleLarge: baseTextTheme.titleLarge?.copyWith(
       fontSize: 22,
       fontWeight: FontWeight.w700,
-      letterSpacing: -0.2,
+      letterSpacing: 0,
     ),
-    titleMedium: const TextStyle(
+    titleMedium: baseTextTheme.titleMedium?.copyWith(
       fontSize: 17,
       fontWeight: FontWeight.w700,
-      letterSpacing: -0.2,
+      letterSpacing: 0,
     ),
-    bodyLarge: const TextStyle(fontSize: 16, height: 1.35),
-    bodyMedium: const TextStyle(fontSize: 14, height: 1.35),
-    labelLarge: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+    bodyLarge: baseTextTheme.bodyLarge?.copyWith(fontSize: 16, height: 1.35),
+    bodyMedium: baseTextTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.35),
+    labelLarge: baseTextTheme.labelLarge?.copyWith(
+      fontSize: 15,
+      fontWeight: FontWeight.w700,
+    ),
   );
 
   return ThemeData(

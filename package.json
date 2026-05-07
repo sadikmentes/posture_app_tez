@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "supabase:link": "supabase link --project-ref nhxeayptdcfcifiouciy",
+    "deploy:ai": "supabase functions deploy ai-posture-chat",
+    "deploy:ai:debug": "supabase functions deploy ai-posture-chat --debug"
+  },
+  "devDependencies": {
+    "supabase": "^2.98.1"
+  }
+}

@@ -13,6 +13,7 @@ class NotificationSettingsPage extends StatefulWidget {
 class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   bool _loading = true;
   bool _postureAlerts = true;
+  bool _escalatingAlarm = false;
   bool _dailyReminder = true;
 
   @override
@@ -23,10 +24,12 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
 
   Future<void> _loadSettings() async {
     final postureAlerts = await ls.LocalStorage.getNotifyPostureAlerts();
+    final escalatingAlarm = await ls.LocalStorage.getNotifyEscalatingAlarm();
     final dailyReminder = await ls.LocalStorage.getNotifyDailyReminder();
     if (!mounted) return;
     setState(() {
       _postureAlerts = postureAlerts;
+      _escalatingAlarm = escalatingAlarm;
       _dailyReminder = dailyReminder;
       _loading = false;
     });
@@ -35,6 +38,11 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   Future<void> _setPostureAlerts(bool value) async {
     setState(() => _postureAlerts = value);
     await ls.LocalStorage.setNotifyPostureAlerts(value);
+  }
+
+  Future<void> _setEscalatingAlarm(bool value) async {
+    setState(() => _escalatingAlarm = value);
+    await ls.LocalStorage.setNotifyEscalatingAlarm(value);
   }
 
   Future<void> _setDailyReminder(bool value) async {
@@ -82,6 +90,21 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         ),
                         subtitle: const Text(
                           "Kamburluk algılandığında anlık uyarı gönder.",
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Card(
+                      child: SwitchListTile.adaptive(
+                        key: const Key("notify_escalating_alarm"),
+                        value: _escalatingAlarm,
+                        onChanged: _postureAlerts ? _setEscalatingAlarm : null,
+                        title: const Text(
+                          "Bildirimi gormezsem seslen",
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: const Text(
+                          "Kotu postur devam ederse 5 uyaridan sonra alarm seviyesinde sesli bildirim gonder.",
                         ),
                       ),
                     ),

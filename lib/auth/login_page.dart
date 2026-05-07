@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:posture_app/storage.dart' as ls;
+import 'package:posture_app/supabase_backend.dart';
 import 'package:posture_app/ui/modern_background.dart';
+
 import '../routes.dart';
 
 class LoginPage extends StatefulWidget {
@@ -13,6 +15,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
+  bool _physiotherapistLogin = false;
 
   @override
   void dispose() {
@@ -24,29 +27,35 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _login() async {
     final email = emailCtrl.text.trim().toLowerCase();
     final pass = passCtrl.text;
-    final user = await ls.LocalStorage.loadUser();
-    if (!mounted) return;
-
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Kayıtlı kullanıcı yok. Önce üye ol.")),
-      );
-      return;
-    }
-
-    final savedEmail = (user["email"] as String).trim().toLowerCase();
-    final savedPass = user["password"] as String;
-
-    if (email == savedEmail && pass == savedPass) {
-      await ls.LocalStorage.setLoggedIn(true);
+    try {
+      final profile = await Backend.signIn(email: email, password: pass);
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, Routes.shell);
-      return;
-    }
+      if (profile == null) {
+        throw Exception('Profil bulunamadi.');
+      }
+      final role = profile['role']?.toString() ?? 'user';
+      if (_physiotherapistLogin && role != 'physiotherapist') {
+        await Backend.signOut();
+        throw Exception('Bu hesap fizyoterapist hesabi degil.');
+      }
+      if (!_physiotherapistLogin && role != 'user') {
+        await Backend.signOut();
+        throw Exception('Bu hesap kullanici hesabi degil.');
+      }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("E-posta veya şifre hatalı.")));
+      await ls.LocalStorage.setLoggedIn(true);
+      await ls.LocalStorage.setCurrentAccount(type: role, email: email);
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(
+        context,
+        role == 'physiotherapist' ? Routes.physiotherapistPortal : Routes.shell,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   @override
@@ -81,7 +90,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            "Hoş geldin",
+                            "Hos geldin",
                             style: TextStyle(
                               fontSize: 30,
                               fontWeight: FontWeight.w800,
@@ -90,7 +99,9 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Postürünü takip et, raporlarını gör.",
+                            _physiotherapistLogin
+                                ? "Danisanlarin sana ulasabilsin."
+                                : "Posturunu takip et, raporlarini gor.",
                             style: TextStyle(
                               color: Colors.white.withAlpha(220),
                             ),
@@ -99,6 +110,25 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: false,
+                          icon: Icon(Icons.person_outline),
+                          label: Text("Kullanici"),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          icon: Icon(Icons.medical_services_outlined),
+                          label: Text("Fizyoterapist"),
+                        ),
+                      ],
+                      selected: {_physiotherapistLogin},
+                      onSelectionChanged: (values) {
+                        setState(() => _physiotherapistLogin = values.first);
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -117,7 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                               controller: passCtrl,
                               obscureText: true,
                               decoration: const InputDecoration(
-                                labelText: "Şifre",
+                                labelText: "Sifre",
                                 prefixIcon: Icon(Icons.lock_outline),
                               ),
                             ),
@@ -126,7 +156,7 @@ class _LoginPageState extends State<LoginPage> {
                               width: double.infinity,
                               child: ElevatedButton(
                                 onPressed: _login,
-                                child: const Text("Giriş Yap"),
+                                child: const Text("Giris Yap"),
                               ),
                             ),
                           ],
@@ -134,13 +164,26 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, Routes.register),
-                      child: Text(
-                        "Hesabın yok mu? Üye ol",
+                    TextButton.icon(
+                      onPressed: () => Navigator.pushNamed(
+                        context,
+                        _physiotherapistLogin
+                            ? Routes.physiotherapistRegister
+                            : Routes.register,
+                      ),
+                      icon: Icon(
+                        _physiotherapistLogin
+                            ? Icons.medical_services_outlined
+                            : Icons.person_add_alt_1_outlined,
+                      ),
+                      label: Text(
+                        _physiotherapistLogin
+                            ? "Uzman hesabi olustur"
+                            : "Hesabin yok mu? Uye ol",
                         style: TextStyle(
-                          color: cs.tertiary,
+                          color: _physiotherapistLogin
+                              ? cs.primary
+                              : cs.tertiary,
                           fontWeight: FontWeight.w700,
                         ),
                       ),

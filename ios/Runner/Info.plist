@@ -26,6 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Konumunuza yakin fizyoterapistleri gostermek icin konum izni gerekir.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>AI postur analizi icin fotograf cekmek amaciyla kamera izni gerekir.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AI postur analizi icin galeriden fotograf secmek amaciyla izin gerekir.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

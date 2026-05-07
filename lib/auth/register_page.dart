@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:posture_app/storage.dart' as ls;
+import 'package:posture_app/supabase_backend.dart';
 import 'package:posture_app/ui/modern_background.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -51,16 +51,20 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    final user = {
-      "fullName": _nameCtrl.text.trim(),
-      "age": int.parse(_ageCtrl.text.trim()),
-      "gender": _gender,
-      "email": _emailCtrl.text.trim(),
-      "phone": _phoneCtrl.text.trim(),
-      "password": _passCtrl.text,
-    };
-
-    await ls.LocalStorage.saveUser(user);
+    try {
+      await Backend.signUpUser(
+        fullName: _nameCtrl.text.trim(),
+        age: int.parse(_ageCtrl.text.trim()),
+        gender: _gender,
+        email: _emailCtrl.text.trim().toLowerCase(),
+        phone: _phoneCtrl.text.trim(),
+        password: _passCtrl.text,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _toast(e.toString().replaceFirst('Exception: ', ''));
+      return;
+    }
 
     if (!mounted) {
       return;
@@ -337,7 +341,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        "Not: Bu surumde bilgiler yerel olarak saklanir.",
+                        "Not: Hesap bilgileri Supabase veritabaninda saklanir.",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: cs.onSurface.withAlpha(160),

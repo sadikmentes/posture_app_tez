@@ -45,9 +45,11 @@ class _DeviceTabState extends State<DeviceTab> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
-            ? "Kalibrasyon tamam ✅ Dik duruş 0 kabul edildi."
-            : "Kalibrasyon olmadı. Veri gelsin diye 1-2 sn bekle, tekrar dene."),
+        content: Text(
+          ok
+              ? 'Kalibrasyon tamamlandı. Dik duruş referans olarak alındı.'
+              : 'Kalibrasyon tamamlanamadı. 1-2 saniye bekleyip tekrar dene.',
+        ),
       ),
     );
   }
@@ -58,12 +60,12 @@ class _DeviceTabState extends State<DeviceTab> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Cihazım"),
+        title: const Text('Cihazım'),
         actions: [
           IconButton(
             onPressed: () => ble.startScan(),
             icon: const Icon(Icons.search),
-            tooltip: "Tara",
+            tooltip: 'Cihazları tara',
           ),
         ],
       ),
@@ -71,16 +73,17 @@ class _DeviceTabState extends State<DeviceTab> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Durum
             StreamBuilder<String>(
               stream: ble.statusStream,
               builder: (_, snap) {
-                final msg = snap.data ?? "Hazır";
+                final msg = snap.data ?? 'Hazır';
                 return Card(
                   child: ListTile(
                     leading: const Icon(Icons.bluetooth),
                     title: Text(
-                      connected == null ? "Bağlı cihaz yok" : "Bağlı: ${connected.remoteId.str}",
+                      connected == null
+                          ? 'Bağlı cihaz yok'
+                          : 'Bağlı: Postur Düzeltici',
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                     subtitle: Text(msg),
@@ -88,85 +91,74 @@ class _DeviceTabState extends State<DeviceTab> {
                         ? null
                         : TextButton(
                             onPressed: () => ble.disconnect(),
-                            child: const Text("Bağlantıyı Kes"),
+                            child: const Text('Bağlantıyı Kes'),
                           ),
                   ),
                 );
               },
             ),
-
             const SizedBox(height: 12),
-
-            // Kamburluk durumu
-            StreamBuilder<bool>(
-              stream: ble.slouchStream,
-              initialData: ble.isSlouching,
-              builder: (_, snap) {
-                final bad = snap.data ?? false;
-                return Card(
-                  child: ListTile(
-                    leading: Icon(bad ? Icons.warning_amber_rounded : Icons.check_circle_outline),
-                    title: Text(
-                      bad ? "Kamburluk algılandı ⚠️" : "Postür normal ✅",
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                    subtitle: Text("Eşik: ${BleManager.slouchThresholdDeg.toStringAsFixed(0)}° (kalibreli)"),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            // Canlı açı + kalibrasyon butonu
             StreamBuilder<Angles>(
               stream: ble.anglesStream,
               builder: (_, snap) {
                 final a = snap.data;
-
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text("Canlı Açı (Kalibreli)", style: TextStyle(fontWeight: FontWeight.w900)),
+                        const Text(
+                          'Canlı Açı (Kalibreli)',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
                         const SizedBox(height: 10),
                         Text(
                           a == null
-                              ? "Veri yok"
-                              : "Pitch: ${a.pitch.toStringAsFixed(0)}°   Roll: ${a.roll.toStringAsFixed(0)}°",
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                              ? 'Veri yok'
+                              : 'Pitch: ${a.pitch.toStringAsFixed(0)}   Roll: ${a.roll.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "Offset → Pitch0: ${ble.pitchOffset.toStringAsFixed(1)}°  Roll0: ${ble.rollOffset.toStringAsFixed(1)}°",
+                          'Offset -> Pitch0: ${ble.pitchOffset.toStringAsFixed(1)}  Roll0: ${ble.rollOffset.toStringAsFixed(1)}',
                           style: TextStyle(color: Colors.grey.shade700),
                         ),
                         const SizedBox(height: 12),
-
-                        // ✅ BUTON BURADA (kesin görünür)
                         ElevatedButton.icon(
-                          onPressed: (connected == null || _calUi) ? null : _kalibreBaslat,
+                          onPressed: (connected == null || _calUi)
+                              ? null
+                              : _kalibreBaslat,
                           icon: const Icon(Icons.tune),
-                          label: Text(_calUi ? "Kalibre ediliyor... ($_sayac)" : "Kalibre Et (3 sn)"),
+                          label: Text(
+                            _calUi
+                                ? 'Kalibre ediliyor... ($_sayac)'
+                                : 'Kalibre Et (3 sn)',
+                          ),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton(
                           onPressed: () {
                             ble.kalibrasyonuSifirla();
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Kalibrasyon sıfırlandı")),
+                              const SnackBar(
+                                content: Text('Kalibrasyon sıfırlandı'),
+                              ),
                             );
                           },
-                          child: const Text("Kalibrasyonu Sıfırla"),
+                          child: const Text('Kalibrasyonu Sıfırla'),
                         ),
-
                         const SizedBox(height: 10),
                         Text(
-                          "Kullanım: Bağlan → dik dur → 3 sn kıpırdama → Kalibre Et.\n"
-                          "Kalibrasyondan sonra |Pitch| veya |Roll| ≥ 35° olursa kamburluk sayılır.",
-                          style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                          'Kullanım: Bağlan -> dik dur -> 3 sn kıpırdama -> Kalibre Et.\n'
+                          'Kalibrasyondan sonra değerler otomatik takip edilir.',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -174,11 +166,12 @@ class _DeviceTabState extends State<DeviceTab> {
                 );
               },
             ),
-
             const SizedBox(height: 12),
-            const Text("Bulunan Cihazlar", style: TextStyle(fontWeight: FontWeight.w900)),
+            const Text(
+              'Bulunan Cihazlar',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 8),
-
             StreamBuilder<List<ScanResult>>(
               stream: ble.scanStream,
               builder: (_, snap) {
@@ -187,7 +180,9 @@ class _DeviceTabState extends State<DeviceTab> {
                   return const Card(
                     child: Padding(
                       padding: EdgeInsets.all(16),
-                      child: Text("Cihaz yok. Sağ üstten 'Tara'ya bas."),
+                      child: Text(
+                        'Cihaz bulunamadı. Sağ üstteki Tara butonuna bas.',
+                      ),
                     ),
                   );
                 }
@@ -199,20 +194,24 @@ class _DeviceTabState extends State<DeviceTab> {
                         child: ListTile(
                           leading: const Icon(Icons.devices),
                           title: Text(
-                            r.advertisementData.advName.isEmpty
-                                ? r.device.remoteId.str
-                                : r.advertisementData.advName,
+                            r.advertisementData.advName.trim().isEmpty
+                                ? 'Postur Düzeltici'
+                                : r.advertisementData.advName.trim(),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
-                          subtitle: Text("RSSI: ${r.rssi}"),
                           trailing: ElevatedButton(
                             onPressed: () async {
                               await ble.connect(r);
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Bağlandı ✅ Şimdi kalibrasyon yap.")),
+                                const SnackBar(
+                                  content: Text(
+                                    'Bağlandı. Şimdi kalibrasyon yap.',
+                                  ),
+                                ),
                               );
                             },
-                            child: const Text("Bağlan"),
+                            child: const Text('Bağlan'),
                           ),
                         ),
                       ),
