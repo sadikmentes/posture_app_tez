@@ -79,16 +79,22 @@ class PostureAiResponder {
   }
 
   static String _summary(Map<String, dynamic> context) {
+    final hasRealSensorData = context['hasRealSensorData'] == true;
     final tracking = context['trackingMinutes'];
     final avg = context['avgScore'] ?? 0;
     final bad = context['badPostureMinutes'] ?? 0;
     final worst = context['worstScore'] ?? 0;
     final best = context['bestScore'] ?? 0;
+    final samples = context['sampleCount'] ?? 0;
+    final quality = context['dataQuality']?.toString() ?? 'unknown';
 
-    if (tracking is num && tracking > 0) {
-      return 'Son 7 gun ozetin: Ortalama skor $avg/100, en dusuk $worst, en iyi $best. Kotu postur suren yaklasik $bad dakika.';
+    if (hasRealSensorData && tracking is num && tracking > 0) {
+      final qualityText = quality == 'limited_samples'
+          ? ' Veri az oldugu icin yorum sinirli olabilir.'
+          : '';
+      return 'Son 7 gun gercek sensor ozetin: $samples olcum, yaklasik $tracking dakika takip. Ortalama skor $avg/100, en dusuk $worst, en iyi $best. Kotu postur suren yaklasik $bad dakika.$qualityText';
     }
-    return 'Henuz yeterli sensor verin yok. Yine de genel postur ve masa basi aliskanliklari icin guvenli oneriler verebilirim.';
+    return 'Henuz rapor olusturacak gercek sensor verin yok. Cihazla takip baslayinca skor, kotu postur suresi ve gunluk dagilimi kullanarak yorum yapabilirim. Simdilik sadece genel postur ve masa basi aliskanliklari icin guvenli oneriler verebilirim.';
   }
 
   static bool _isGreeting(String text) {

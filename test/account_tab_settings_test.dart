@@ -24,7 +24,9 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(home: AccountTab(onOpenDeviceTab: () {})),
+      MaterialApp(
+        home: AccountTab(hasDevice: true, onOpenDeviceTab: () async {}),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -38,7 +40,9 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(home: AccountTab(onOpenDeviceTab: () {})),
+      MaterialApp(
+        home: AccountTab(hasDevice: true, onOpenDeviceTab: () async {}),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -52,7 +56,12 @@ void main() {
     var opened = false;
 
     await tester.pumpWidget(
-      MaterialApp(home: AccountTab(onOpenDeviceTab: () => opened = true)),
+      MaterialApp(
+        home: AccountTab(
+          hasDevice: true,
+          onOpenDeviceTab: () async => opened = true,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 

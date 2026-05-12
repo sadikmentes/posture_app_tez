@@ -19,6 +19,9 @@ Davranis:
 - Kullanici selam verirse kisa ve sicak karsilik ver.
 - Kullanici genel bir soru sorarsa once kisa cevap ver, sonra postur/saglik tarafina bagla.
 - Kullanici postur, boyun, omuz, sirt, bel, masa basi, egzersiz, rapor veya cihaz verisi sorarsa uygulamanin son 7 gunluk ozetini kullan.
+- Postur ozeti JSON disinda skor, dakika, gunluk dagilim veya cihaz verisi uydurma.
+- postureContext.hasRealSensorData false veya sampleCount 0 ise rapor olusturma; "henuz yeterli sensor verisi yok" de ve genel onerilerle sinirli kal.
+- dataQuality "limited_samples" ise yorumun sinirli oldugunu belirt.
 - Cevaplari genelde 2-5 kisa paragraf veya 3-5 madde ile sinirla.
 - Her cevapta uzun yasal uyari yazma.
 
@@ -417,9 +420,12 @@ function fallbackAnswer(
   const avg = Number(context["avgScore"] ?? 0);
   const bad = Number(context["badPostureMinutes"] ?? 0);
   const tracking = Number(context["trackingMinutes"] ?? 0);
-  const scoreLine = tracking > 0
-    ? `Son 7 gun ozetin: ortalama skor ${avg}/100, kotu postur suren yaklasik ${bad} dakika.`
-    : "Henuz yeterli sensor verin yok; yine de genel postur onerisi verebilirim.";
+  const samples = Number(context["sampleCount"] ?? 0);
+  const hasReal = context["hasRealSensorData"] === true;
+  const quality = String(context["dataQuality"] ?? "unknown");
+  const scoreLine = hasReal && tracking > 0
+    ? `Son 7 gun gercek sensor ozetin: ${samples} olcum, yaklasik ${tracking} dakika takip, ortalama skor ${avg}/100, kotu postur suren yaklasik ${bad} dakika.${quality === "limited_samples" ? " Veri az oldugu icin yorum sinirli olabilir." : ""}`
+    : "Henuz rapor olusturacak gercek sensor verin yok; skor veya dakika uydurmadan sadece genel postur onerisi verebilirim.";
 
   const prefix =
     `Gercek AI baglantisi su an devrede degil (${diagnostic || "bilinmeyen neden"}). ` +

@@ -18,8 +18,10 @@ class LocalStorage {
   static const _kNotifyDailyReminder = "settings.notifications.daily_reminder";
   static const _kPrivacyShareAnalytics = "settings.privacy.share_analytics";
   static const _kPrivacyCrashReports = "settings.privacy.crash_reports";
+  static const _kConsents = "settings.privacy.consents.v1";
   static const _kPostureSamples = "metrics.posture.samples.v1";
   static const _kHealthProfile = "user_health_profile.v1";
+  static const _kPostureDeviceByEmail = "settings.posture_device.by_email.v1";
 
   static Future<void> saveUser(Map<String, dynamic> user) async {
     final sp = await SharedPreferences.getInstance();
@@ -270,6 +272,40 @@ class LocalStorage {
     return sp.getString(_kCurrentEmail);
   }
 
+  static Future<bool?> getHasPostureDevice({String? userEmail}) async {
+    final sp = await SharedPreferences.getInstance();
+    final email = await _devicePreferenceEmail(userEmail);
+    final raw = sp.getString(_kPostureDeviceByEmail);
+    if (raw == null || raw.isEmpty) return null;
+
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    final value = decoded[email];
+    return value is bool ? value : null;
+  }
+
+  static Future<void> setHasPostureDevice(
+    bool value, {
+    String? userEmail,
+  }) async {
+    final sp = await SharedPreferences.getInstance();
+    final email = await _devicePreferenceEmail(userEmail);
+    final raw = sp.getString(_kPostureDeviceByEmail);
+    final data = <String, dynamic>{};
+    if (raw != null && raw.isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) data.addAll(Map<String, dynamic>.from(decoded));
+    }
+    data[email] = value;
+    await sp.setString(_kPostureDeviceByEmail, jsonEncode(data));
+  }
+
+  static Future<String> _devicePreferenceEmail(String? userEmail) async {
+    final email = userEmail ?? await getCurrentEmail();
+    final normalized = email?.trim().toLowerCase();
+    return normalized == null || normalized.isEmpty ? "local" : normalized;
+  }
+
   static Future<bool> isLoggedIn() async {
     final sp = await SharedPreferences.getInstance();
     return sp.getBool(_kLoggedIn) ?? false;
@@ -330,6 +366,38 @@ class LocalStorage {
   static Future<void> setPrivacyCrashReports(bool v) async {
     final sp = await SharedPreferences.getInstance();
     await sp.setBool(_kPrivacyCrashReports, v);
+  }
+
+  static Future<bool> hasConsent(String key) async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kConsents);
+    if (raw == null || raw.isEmpty) return false;
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return false;
+    final item = decoded[key];
+    if (item is bool) return item;
+    if (item is Map) return item['granted'] == true;
+    return false;
+  }
+
+  static Future<void> setConsent(
+    String key,
+    bool granted, {
+    String version = 'v1',
+  }) async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kConsents);
+    final data = <String, dynamic>{};
+    if (raw != null && raw.isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) data.addAll(Map<String, dynamic>.from(decoded));
+    }
+    data[key] = {
+      'granted': granted,
+      'version': version,
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+    await sp.setString(_kConsents, jsonEncode(data));
   }
 
   static Future<List<Map<String, dynamic>>> _loadLegacyPostureSamples() async {

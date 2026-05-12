@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:posture_app/pages/chat_page.dart';
+import 'package:posture_app/storage.dart' as ls;
 import 'package:posture_app/supabase_backend.dart';
 import 'package:posture_app/ui/modern_background.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -589,6 +590,9 @@ out center 40;
       return;
     }
 
+    final consentGranted = await _ensurePhysioSharingConsent(profile);
+    if (!consentGranted) return;
+
     try {
       await Backend.createSupportRequest(
         physiotherapist: profile,
@@ -606,6 +610,50 @@ out center 40;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Talep fizyoterapist paneline gonderildi.')),
     );
+  }
+
+  Future<bool> _ensurePhysioSharingConsent(Map<String, dynamic> profile) async {
+    final hasConsent = await ls.LocalStorage.hasConsent('physio_data_sharing');
+    if (hasConsent) return true;
+    if (!mounted) return false;
+
+    final name = profile['full_name']?.toString() ?? 'fizyoterapist';
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('Veri Paylasimi Onayi'),
+          content: Text(
+            'Talep veya sohbet baslattiginda adin, iletisim bilgin, yazdigin mesaj ve uygulamadaki ilgili postur/saglik ozeti $name ile paylasilabilir. Bu paylasim fizyoterapist destegi icindir.',
+            style: TextStyle(color: cs.onSurface.withAlpha(180), height: 1.35),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgec'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Kabul ediyorum'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (accepted != true) return false;
+    await ls.LocalStorage.setConsent('physio_data_sharing', true);
+    await Backend.recordConsent(
+      consentKey: 'physio_data_sharing',
+      version: 'v1',
+      granted: true,
+      metadata: {
+        'source': 'physiotherapist_contact',
+        'physiotherapistId': profile['id']?.toString(),
+      },
+    );
+    return true;
   }
 
   Future<void> _openRequestSheet(Map<String, dynamic> profile) async {
@@ -734,6 +782,9 @@ out center 40;
       );
       return;
     }
+
+    final consentGranted = await _ensurePhysioSharingConsent(profile);
+    if (!consentGranted) return;
 
     late final Map<String, dynamic> request;
     try {

@@ -5,6 +5,8 @@ import 'package:posture_app/storage.dart' as ls;
 import 'package:posture_app/supabase_backend.dart';
 import 'package:posture_app/ui/modern_background.dart';
 
+import '../routes.dart';
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -39,6 +41,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _saving = false;
   bool _hidePass = true;
   bool _hidePass2 = true;
+  bool _termsConsent = false;
+  bool _kvkkConsent = false;
+  bool _healthDataConsent = false;
+  bool _medicalDisclaimerConsent = false;
 
   static const _totalSteps = 8;
   static const _postureOptions = [
@@ -95,12 +101,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _toast(message);
       return;
     }
+    if (_step == _totalSteps - 1 && !_hasRequiredConsents) {
+      _toast('Devam etmek icin zorunlu onaylari tamamla.');
+      return;
+    }
     if (_step == _totalSteps - 1) {
       await _finish();
       return;
     }
     setState(() => _step += 1);
   }
+
+  bool get _hasRequiredConsents =>
+      _termsConsent &&
+      _kvkkConsent &&
+      _healthDataConsent &&
+      _medicalDisclaimerConsent;
 
   Future<void> _back() async {
     if (_step == 0 || _saving) return;
@@ -110,17 +126,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _finish() async {
     setState(() => _saving = true);
     final profile = _buildProfile();
+    final email = _emailCtrl.text.trim().toLowerCase();
     try {
       await Backend.signUpUser(
         fullName: profile.fullName,
         age: profile.age,
         gender: profile.gender,
-        email: _emailCtrl.text.trim().toLowerCase(),
+        email: email,
         phone: _phoneCtrl.text.trim(),
         password: _passCtrl.text,
         healthProfile: profile,
       );
-      final email = _emailCtrl.text.trim().toLowerCase();
       await ls.LocalStorage.saveHealthProfile(profile, userEmail: email);
       await ls.LocalStorage.saveUser({
         'name': profile.fullName,
@@ -130,6 +146,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'gender': profile.gender,
         'health_profile': profile.toJson(),
       });
+      await ls.LocalStorage.setLoggedIn(true);
+      await ls.LocalStorage.setCurrentAccount(type: 'user', email: email);
+      await _saveRequiredConsents(profile);
+      try {
+        await Backend.signIn(email: email, password: _passCtrl.text);
+      } catch (_) {}
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -139,6 +161,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!mounted) return;
     setState(() => _saving = false);
     _showRiskDialog(profile);
+  }
+
+  Future<void> _saveRequiredConsents(UserHealthProfile profile) async {
+    final metadata = {
+      'source': 'user_onboarding',
+      'riskLevel': profile.riskLevel.name,
+    };
+    final consents = {
+      'terms_of_use': _termsConsent,
+      'kvkk_notice': _kvkkConsent,
+      'health_data_processing': _healthDataConsent,
+      'medical_disclaimer': _medicalDisclaimerConsent,
+    };
+
+    for (final entry in consents.entries) {
+      await ls.LocalStorage.setConsent(entry.key, entry.value);
+      await Backend.recordConsent(
+        consentKey: entry.key,
+        version: 'v1',
+        granted: entry.value,
+        metadata: metadata,
+      );
+    }
   }
 
   UserHealthProfile _buildProfile() {
@@ -190,9 +235,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             FilledButton(
               onPressed: () {
                 Navigator.pop(context);
-                Navigator.pop(context);
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  Routes.deviceAvailability,
+                  (_) => false,
+                );
               },
-              child: const Text('Girişe dön'),
+              child: const Text('Devam et'),
             ),
           ],
         );
@@ -440,6 +489,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _slider('Günlük bilgisayar kullanımı', _computerHours, 0, 14, (v) {
             setState(() => _computerHours = v);
           }),
+          const SizedBox(height: 14),
+          _consentTile(
+            value: _termsConsent,
+            title: 'Kullanim sartlarini kabul ediyorum.',
+            subtitle:
+                'Uygulamanin tani, tedavi veya acil saglik hizmeti sunmadigini biliyorum.',
+            onChanged: (value) => setState(() => _termsConsent = value),
+          ),
+          _consentTile(
+            value: _kvkkConsent,
+            title: 'KVKK aydinlatma metnini okudum.',
+            subtitle:
+                'Kisisel verilerimin hangi amaclarla islenecegi hakkinda bilgilendirildim.',
+            onChanged: (value) => setState(() => _kvkkConsent = value),
+          ),
+          _consentTile(
+            value: _healthDataConsent,
+            title: 'Saglik verilerimin islenmesine acik riza veriyorum.',
+            subtitle:
+                'Agri, postur gecmisi, cihaz olcumleri ve egzersiz verilerimin uygulama islevleri icin islenmesini onayliyorum.',
+            onChanged: (value) => setState(() => _healthDataConsent = value),
+          ),
+          _consentTile(
+            value: _medicalDisclaimerConsent,
+            title: 'Tibbi sorumluluk reddini kabul ediyorum.',
+            subtitle:
+                'Skor ve onerilerin bilgilendirme amacli oldugunu; ciddi belirtilerde uzmana basvurmam gerektigini biliyorum.',
+            onChanged: (value) =>
+                setState(() => _medicalDisclaimerConsent = value),
+          ),
         ],
       ),
     );
@@ -657,6 +736,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           },
         );
       }).toList(),
+    );
+  }
+
+  Widget _consentTile({
+    required bool value,
+    required String title,
+    required String subtitle,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: CheckboxListTile(
+        value: value,
+        onChanged: (next) => onChanged(next ?? false),
+        controlAffinity: ListTileControlAffinity.leading,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12, height: 1.25),
+        ),
+      ),
     );
   }
 

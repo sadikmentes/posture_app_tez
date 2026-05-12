@@ -1,9 +1,10 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:posture_app/posture_score_calculator.dart';
 import 'package:posture_app/storage.dart' as ls;
 
 enum PostureSensitivity { strict, balanced, relaxed }
@@ -98,8 +99,8 @@ class BleManager {
   Completer<bool>? _pendingFirmwareCal;
   final _rxBuf = StringBuffer();
 
-  // State token (GOOD/BAD) opsiyonel — eski firmware "pitch,roll\n",
-  // yeni firmware "pitch,roll,GOOD|BAD" gönderiyor, ikisi de eşleşir.
+  // State token (GOOD/BAD) opsiyonel â€” eski firmware "pitch,roll\n",
+  // yeni firmware "pitch,roll,GOOD|BAD" gÃ¶nderiyor, ikisi de eÅŸleÅŸir.
   static final RegExp _statusPacketRegex = RegExp(
     r'(-?\d+(?:\.\d+)?)\s*[,;|/ ]\s*(-?\d+(?:\.\d+)?)(?:\s*[,;|/ ]\s*(GOOD|BAD|GOOD_POSTURE|BAD_POSTURE))?',
     caseSensitive: false,
@@ -123,6 +124,8 @@ class BleManager {
 
   Angles? _lastRaw;
   Angles? _lastCalibrated;
+  PostureScoreResult? _lastScoreResult;
+  final PostureScoreStabilizer _scoreStabilizer = PostureScoreStabilizer();
 
   Angles? get lastRaw => _lastRaw;
   Angles? get lastCalibrated => _lastCalibrated;
@@ -140,6 +143,7 @@ class BleManager {
 
   PostureState _postureState = PostureState.neutral;
   PostureState get postureState => _postureState;
+  PostureScoreResult? get postureScoreResult => _lastScoreResult;
 
   PostureSensitivity _sensitivity = PostureSensitivity.balanced;
   PostureSensitivity get sensitivity => _sensitivity;
@@ -198,6 +202,10 @@ class BleManager {
   double get slouchRollDeg => _thresholds.badRoll;
   double get severePitchDeg => _thresholds.badPitch + 10.0;
   double get severeRollDeg => _thresholds.badRoll + 8.0;
+  double get rollWarningThresholdDeg =>
+      _sensitivity == PostureSensitivity.strict
+      ? PostureScoreCalculator.sensitiveRollThreshold
+      : PostureScoreCalculator.defaultRollThreshold;
   int get cautionHoldSeconds => _thresholds.badConfirm.inSeconds;
   int get slouchHoldSeconds => _thresholds.badConfirm.inSeconds;
   int get severeHoldSeconds =>
@@ -205,52 +213,25 @@ class BleManager {
 
   int get postureScore {
     if (!_hasSmoothed) return 100;
-
-    final t = _thresholds;
-    final pitchAbs = _smoothPitch.abs();
-    final rollAbs = _smoothRoll.abs();
-
-    double score;
-    if (pitchAbs <= t.goodPitch) {
-      score = 100.0 - (pitchAbs / t.goodPitch) * 8.0;
-    } else if (pitchAbs <= t.badPitch) {
-      final ratio = (pitchAbs - t.goodPitch) / (t.badPitch - t.goodPitch);
-      score = 92.0 - ratio * 28.0;
-    } else {
-      final severePitch = t.badPitch + 16.0;
-      final ratio = ((pitchAbs - t.badPitch) / (severePitch - t.badPitch))
-          .clamp(0.0, 1.0);
-      score = 64.0 - ratio * 44.0;
-      if (pitchAbs > severePitch) {
-        score -= (pitchAbs - severePitch) * 1.2;
-      }
-    }
-
-    // Roll is secondary in the firmware; keep small influence.
-    score -= (rollAbs * 0.45).clamp(0.0, 12.0);
-
-    if (_firmwareBad == true) {
-      score = math.min(score, 62.0);
-    } else if (_firmwareBad == false && pitchAbs <= t.goodPitch) {
-      score = math.max(score, 94.0);
-    }
-
-    return score.round().clamp(0, 100);
+    return _lastScoreResult?.score ?? 100;
   }
 
   String get postureSummary {
     if (!_hasSmoothed) return 'Veri bekleniyor';
     if (_deviceIdle) return 'Cihaz bekleme modunda';
 
+    final scoreResult = _lastScoreResult;
+    if (scoreResult != null) return scoreResult.warningText;
+
     switch (_postureState) {
       case PostureState.neutral:
-        return 'Duruş dengede';
+        return 'DuruÅŸ dengede';
       case PostureState.caution:
-        return 'Sınırda';
+        return 'SÄ±nÄ±rda';
       case PostureState.slouch:
-        return 'Düzeltme gerekli';
+        return 'DÃ¼zeltme gerekli';
       case PostureState.severe:
-        return 'Yüksek sapma';
+        return 'YÃ¼ksek sapma';
     }
   }
 
@@ -266,7 +247,7 @@ class BleManager {
   String sensitivityLabel(PostureSensitivity value) {
     switch (value) {
       case PostureSensitivity.strict:
-        return 'Sıkı';
+        return 'SÄ±kÄ±';
       case PostureSensitivity.balanced:
         return 'Dengeli';
       case PostureSensitivity.relaxed:
@@ -277,10 +258,12 @@ class BleManager {
   void resetCalibration() {
     _pitchOffset = 0.0;
     _rollOffset = 0.0;
+    _resetAngleSmoothing();
+    _scoreStabilizer.reset();
     _clearLocalCandidates();
     _firmwareBad = null;
     _setPostureState(PostureState.neutral);
-    _statusCtrl.add('Kalibrasyon sıfırlandı');
+    _statusCtrl.add('Kalibrasyon sÄ±fÄ±rlandÄ±');
   }
 
   Future<bool> calibrateAverage({
@@ -289,32 +272,59 @@ class BleManager {
     if (_isCalibrating) return false;
 
     _isCalibrating = true;
-    _statusCtrl.add('Kalibrasyon başlatılıyor...');
+    _statusCtrl.add('Kalibrasyon baslatiliyor...');
 
     if (_device != null && _commandChar != null) {
       final ok = await _calibrateFromFirmware(duration: duration);
       _isCalibrating = false;
       if (ok) {
+        _isCalibrating = true;
+        final appOk = await _calibrateFromIncomingSamples(
+          duration: const Duration(milliseconds: 1200),
+          minimumSamples: 2,
+        );
+        _isCalibrating = false;
+
+        if (appOk) {
+          _finishCalibration('Kalibrasyon tamamlandi');
+          return true;
+        }
+
         _pitchOffset = 0.0;
         _rollOffset = 0.0;
-        _deviceIdle = false;
-        _firmwareBad = null;
-        _clearLocalCandidates();
-        _setPostureState(PostureState.neutral);
-        _statusCtrl.add('Kalibrasyon tamamlandı (cihaz)');
+        _finishCalibration('Kalibrasyon tamamlandi (cihaz)');
         return true;
       }
-      _statusCtrl.add(
-        'Cihazdan CAL_OK gelmedi, uygulama kalibrasyonu deneniyor...',
-      );
+      _statusCtrl.add('Cihazdan CAL_OK gelmedi, uygulama kalibrasyonu deneniyor...');
     }
 
     if (_lastRaw == null) {
       _isCalibrating = false;
-      _statusCtrl.add('Kalibrasyon için veri bekleniyor');
+      _statusCtrl.add('Kalibrasyon icin veri bekleniyor');
       return false;
     }
 
+    final appOk = await _calibrateFromIncomingSamples(
+      duration: duration,
+      minimumSamples: 5,
+    );
+    _isCalibrating = false;
+
+    if (!appOk) {
+      _statusCtrl.add('Kalibrasyon basarisiz (yetersiz veri)');
+      return false;
+    }
+
+    _finishCalibration(
+      'Kalibre edildi (Pitch0= Roll0=)',
+    );
+    return true;
+  }
+
+  Future<bool> _calibrateFromIncomingSamples({
+    required Duration duration,
+    required int minimumSamples,
+  }) async {
     double sumP = 0.0;
     double sumR = 0.0;
     int n = 0;
@@ -328,23 +338,23 @@ class BleManager {
     await Future.delayed(duration);
     await sub.cancel();
 
-    _isCalibrating = false;
-
-    if (n < 5) {
-      _statusCtrl.add('Kalibrasyon başarısız (yetersiz veri)');
+    if (n < minimumSamples) {
       return false;
     }
 
     _pitchOffset = sumP / n;
     _rollOffset = sumR / n;
+    return true;
+  }
 
+  void _finishCalibration(String status) {
+    _resetAngleSmoothing();
+    _deviceIdle = false;
     _firmwareBad = null;
+    _scoreStabilizer.reset();
     _clearLocalCandidates();
     _setPostureState(PostureState.neutral);
-    _statusCtrl.add(
-      'Kalibre edildi (Pitch0=${_pitchOffset.toStringAsFixed(1)} Roll0=${_rollOffset.toStringAsFixed(1)})',
-    );
-    return true;
+    _statusCtrl.add(status);
   }
 
   Future<bool> _calibrateFromFirmware({
@@ -404,7 +414,7 @@ class BleManager {
 
   String _normalizeName(String raw) {
     var out = raw.toLowerCase().trim();
-    const map = {'ü': 'u', 'ö': 'o', 'ğ': 'g', 'ş': 's', 'ı': 'i', 'ç': 'c'};
+    const map = {'Ã¼': 'u', 'Ã¶': 'o', 'ÄŸ': 'g', 'ÅŸ': 's', 'Ä±': 'i', 'Ã§': 'c'};
     map.forEach((k, v) => out = out.replaceAll(k, v));
     out = out.replaceAll('-', '_').replaceAll(' ', '_');
     return out;
@@ -457,6 +467,8 @@ class BleManager {
 
     _lastRaw = null;
     _lastCalibrated = null;
+    _lastScoreResult = null;
+    _scoreStabilizer.reset();
     _lastPacketAt = null;
     _lastPersistAt = null;
 
@@ -475,6 +487,14 @@ class BleManager {
     }
   }
 
+  void _resetAngleSmoothing() {
+    _hasSmoothed = false;
+    _smoothPitch = 0.0;
+    _smoothRoll = 0.0;
+    _lastCalibrated = null;
+    _lastScoreResult = null;
+  }
+
   void _setPostureState(PostureState next) {
     if (_postureState != next) {
       _postureState = next;
@@ -482,16 +502,16 @@ class BleManager {
 
       switch (next) {
         case PostureState.neutral:
-          _statusCtrl.add('Duruş dengede');
+          _statusCtrl.add('DuruÅŸ dengede');
           break;
         case PostureState.caution:
-          _statusCtrl.add('Duruş sınırda');
+          _statusCtrl.add('DuruÅŸ sÄ±nÄ±rda');
           break;
         case PostureState.slouch:
-          _statusCtrl.add('Düzeltme gerekli');
+          _statusCtrl.add('DÃ¼zeltme gerekli');
           break;
         case PostureState.severe:
-          _statusCtrl.add('Yüksek sapma');
+          _statusCtrl.add('YÃ¼ksek sapma');
           break;
       }
     }
@@ -524,14 +544,27 @@ class BleManager {
     final now = DateTime.now();
 
     if (_firmwareBad != null) {
-      _applyFirmwareState(_firmwareBad!);
-      return;
+      if (_firmwareBad == true && (_lastScoreResult?.score ?? 100) <= 80) {
+        _applyFirmwareState(true);
+        return;
+      }
     }
 
     final t = _thresholds;
-    final pitchAbs = _smoothPitch.abs();
-    final isBadNow = pitchAbs >= t.badPitch;
-    final isGoodNow = pitchAbs <= t.goodPitch;
+    final scoreResult = _lastScoreResult;
+    final d = scoreResult?.d ?? 0.0;
+    final hasAxisWarning =
+        (scoreResult?.pitchWarning ?? false) ||
+        (scoreResult?.rollWarning ?? false);
+    final isSevereNow = d > 40.0;
+    final isBadNow = hasAxisWarning || d > 20.0;
+    final isGoodNow = d <= 10.0 && !hasAxisWarning;
+
+    if (isSevereNow) {
+      _setPostureState(PostureState.severe);
+      _clearLocalCandidates();
+      return;
+    }
 
     if (_postureState == PostureState.slouch ||
         _postureState == PostureState.severe) {
@@ -553,8 +586,12 @@ class BleManager {
         _setPostureState(PostureState.slouch);
         _clearLocalCandidates();
       }
+    } else if (d > 10.0) {
+      _badCandidateSince = null;
+      _setPostureState(PostureState.caution);
     } else {
       _badCandidateSince = null;
+      _setPostureState(PostureState.neutral);
     }
   }
 
@@ -577,6 +614,10 @@ class BleManager {
       'roll': _lastCalibrated?.roll,
       'rawPitch': _lastRaw?.pitch,
       'rawRoll': _lastRaw?.roll,
+      'deviation': _lastScoreResult?.d,
+      'deltaPitch': _lastScoreResult?.deltaPitch,
+      'deltaRoll': _lastScoreResult?.deltaRoll,
+      'warningText': _lastScoreResult?.warningText,
       'sensitivity': _sensitivity.name,
       'deviceId': _activeDeviceId,
       'sessionId': _activeSessionId,
@@ -591,7 +632,10 @@ class BleManager {
     _lastRaw = raw;
     _rawAnglesCtrl.add(raw);
 
-    final calibrated = Angles(pitch - _pitchOffset, roll - _rollOffset);
+    final calibrated = Angles(
+      _normalizeAngle(pitch - _pitchOffset),
+      _normalizeAngle(roll - _rollOffset),
+    );
     _lastCalibrated = calibrated;
 
     const alpha = 0.40;
@@ -604,15 +648,26 @@ class BleManager {
       _smoothRoll = alpha * calibrated.roll + (1 - alpha) * _smoothRoll;
     }
 
+    final scoreResult = PostureScoreCalculator(
+      currentPitch: _smoothPitch,
+      currentRoll: _smoothRoll,
+      calibratedPitch: 0.0,
+      calibratedRoll: 0.0,
+      rollThreshold: rollWarningThresholdDeg,
+    ).calculate();
+    _lastScoreResult = _scoreStabilizer.apply(scoreResult);
+
     _anglesCtrl.add(Angles(_smoothPitch, _smoothRoll));
     _lastPacketAt = DateTime.now();
     _deviceIdle = false;
 
     final token = stateToken?.trim().toUpperCase();
     if (token == 'BAD' || token == 'BAD_POSTURE') {
-      _applyFirmwareState(true);
+      _firmwareBad = true;
+      _evaluateStateFromCurrentAngles();
     } else if (token == 'GOOD' || token == 'GOOD_POSTURE') {
-      _applyFirmwareState(false);
+      _firmwareBad = false;
+      _evaluateStateFromCurrentAngles();
     } else {
       _evaluateStateFromCurrentAngles();
     }
@@ -631,15 +686,16 @@ class BleManager {
       _pendingFirmwareCal = null;
       _pitchOffset = 0.0;
       _rollOffset = 0.0;
+      _resetAngleSmoothing();
       _deviceIdle = false;
       _firmwareBad = null;
       _clearLocalCandidates();
-      _statusCtrl.add('CAL_OK alındı');
+      _statusCtrl.add('CAL_OK alÄ±ndÄ±');
       handled = true;
     }
 
     if (token.contains('READY')) {
-      _statusCtrl.add('Cihaz hazır');
+      _statusCtrl.add('Cihaz hazÄ±r');
       handled = true;
     }
 
@@ -651,7 +707,7 @@ class BleManager {
 
     if (token.contains('WAKE')) {
       _deviceIdle = false;
-      _statusCtrl.add('Cihaz aktif moda döndü');
+      _statusCtrl.add('Cihaz aktif moda dÃ¶ndÃ¼');
       handled = true;
     }
 
@@ -676,10 +732,10 @@ class BleManager {
       final bytes = utf8.encode(command);
       final withoutResponse = c.properties.writeWithoutResponse;
       await c.write(bytes, withoutResponse: withoutResponse);
-      _statusCtrl.add('Komut gönderildi: $command');
+      _statusCtrl.add('Komut gÃ¶nderildi: $command');
       return true;
     } catch (_) {
-      _statusCtrl.add('Komut gönderilemedi: $command');
+      _statusCtrl.add('Komut gÃ¶nderilemedi: $command');
       return false;
     }
   }
@@ -771,13 +827,24 @@ class BleManager {
 
     final dtMs = DateTime.now().difference(prevAt).inMilliseconds;
     final maxDelta = math.max(
-      (pitch - prev.pitch).abs(),
-      (roll - prev.roll).abs(),
+      _angularDistance(pitch, prev.pitch),
+      _angularDistance(roll, prev.roll),
     );
 
     // Protect against corrupted merged chunks.
     if (dtMs <= 450 && maxDelta > 80) return false;
     return true;
+  }
+
+  double _normalizeAngle(double value) {
+    var normalized = value % 360.0;
+    if (normalized > 180.0) normalized -= 360.0;
+    if (normalized < -180.0) normalized += 360.0;
+    return normalized;
+  }
+
+  double _angularDistance(double current, double reference) {
+    return _normalizeAngle(current - reference).abs();
   }
 
   Future<void> startScan({
@@ -790,13 +857,13 @@ class BleManager {
     }
 
     if (!await ensureBluetoothOn()) {
-      _statusCtrl.add('Bluetooth kapalı');
+      _statusCtrl.add('Bluetooth kapalÄ±');
       return;
     }
 
     _scanMap.clear();
     _scanCtrl.add(const []);
-    _statusCtrl.add('Taranıyor...');
+    _statusCtrl.add('TaranÄ±yor...');
 
     await stopScan();
     await _scanSub?.cancel();
@@ -840,7 +907,7 @@ class BleManager {
     final label = r.advertisementData.advName.trim().isEmpty
         ? r.device.remoteId.str
         : r.advertisementData.advName.trim();
-    _statusCtrl.add('Bağlanılıyor: $label');
+    _statusCtrl.add('BaÄŸlanÄ±lÄ±yor: $label');
 
     try {
       await d.disconnect();
@@ -860,7 +927,7 @@ class BleManager {
     _connSub?.cancel();
     _connSub = d.connectionState.listen((s) async {
       if (s == BluetoothConnectionState.disconnected) {
-        _statusCtrl.add('Bağlantı koptu');
+        _statusCtrl.add('BaÄŸlantÄ± koptu');
         _device = null;
         _angleChar = null;
         _commandChar = null;
@@ -921,14 +988,14 @@ class BleManager {
     }
 
     if (foundAngle == null) {
-      _statusCtrl.add('Açı karakteristiği bulunamadı');
+      _statusCtrl.add('AÃ§Ä± karakteristiÄŸi bulunamadÄ±');
       return;
     }
 
     _angleChar = foundAngle;
     _commandChar = foundCommand;
     _statusCtrl.add(
-      'Bağlandı. Veri=${foundAngle.uuid} Komut=${_commandChar?.uuid ?? '-'}',
+      'BaÄŸlandÄ±. Veri=${foundAngle.uuid} Komut=${_commandChar?.uuid ?? '-'}',
     );
 
     await _subscribeAngles();
@@ -947,10 +1014,10 @@ class BleManager {
     await _endLocalSession();
     _resetRuntimeState();
 
-    // BLE bağlantısının stabilize olması için kısa bekleme
+    // BLE baÄŸlantÄ±sÄ±nÄ±n stabilize olmasÄ± iÃ§in kÄ±sa bekleme
     await Future.delayed(const Duration(milliseconds: 400));
 
-    // setNotifyValue başarısız olabilir — 3 deneme yap
+    // setNotifyValue baÅŸarÄ±sÄ±z olabilir â€” 3 deneme yap
     var notifyEnabled = false;
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -965,7 +1032,7 @@ class BleManager {
     if (notifyEnabled) {
       _statusCtrl.add('Notify aktif');
     } else {
-      _statusCtrl.add('Notify açılamadı, read fallback aktif');
+      _statusCtrl.add('Notify aÃ§Ä±lamadÄ±, read fallback aktif');
     }
 
     _notifySub = c.onValueReceived.listen((bytes) {
@@ -1054,7 +1121,7 @@ class BleManager {
     }
 
     _resetRuntimeState();
-    _statusCtrl.add('Bağlantı kesildi');
+    _statusCtrl.add('BaÄŸlantÄ± kesildi');
   }
 
   void dispose() {

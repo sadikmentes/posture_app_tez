@@ -20,6 +20,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   bool _loading = true;
   bool _sending = false;
   bool _localMode = false;
+  bool _needsAiConsent = false;
   String? _error;
 
   @override
@@ -36,6 +37,15 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
   }
 
   Future<void> _load() async {
+    final hasAiConsent = await ls.LocalStorage.hasConsent('ai_disclaimer');
+    if (!hasAiConsent) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _needsAiConsent = true;
+      });
+      return;
+    }
     try {
       final context = await _buildPostureContext();
       final thread = await Backend.ensureAiChatThread();
@@ -47,6 +57,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         _thread = thread;
         _messages = messages;
         _loading = false;
+        _needsAiConsent = false;
         _localMode = false;
         _error = null;
       });
@@ -59,10 +70,27 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         _thread = {'id': 'local'};
         _messages = const [];
         _loading = false;
+        _needsAiConsent = false;
         _localMode = true;
         _error = null;
       });
     }
+  }
+
+  Future<void> _acceptAiConsent() async {
+    await ls.LocalStorage.setConsent('ai_disclaimer', true);
+    await Backend.recordConsent(
+      consentKey: 'ai_disclaimer',
+      version: 'v1',
+      granted: true,
+      metadata: const {'source': 'ai_assistant_first_open'},
+    );
+    if (!mounted) return;
+    setState(() {
+      _needsAiConsent = false;
+      _loading = true;
+    });
+    await _load();
   }
 
   Future<Map<String, dynamic>> _buildPostureContext() async {
@@ -72,9 +100,11 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       now.month,
       now.day,
     ).subtract(const Duration(days: 6));
+    final currentEmail = await ls.LocalStorage.getCurrentEmail();
     final raw = await ls.LocalStorage.loadPostureSamples(
       from: start,
       to: now.add(const Duration(minutes: 1)),
+      userEmail: currentEmail,
     );
 
     final samples = raw
@@ -86,12 +116,16 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     if (samples.isEmpty) {
       return {
         'period': 'last_7_days',
+        'source': 'local_device_samples',
+        'hasRealSensorData': false,
+        'dataQuality': 'no_samples',
         'sampleCount': 0,
         'trackingMinutes': 0,
         'avgScore': 0,
         'badPostureMinutes': 0,
         'worstScore': 0,
         'bestScore': 0,
+        'dailyBreakdown': const [],
       };
     }
 
@@ -100,16 +134,76 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     const minutesPerSample = 0.5;
     final avg = scores.reduce((a, b) => a + b) / scores.length;
     scores.sort();
+    final dailyBreakdown = _dailyBreakdown(samples, start, now);
+    final latest = samples.last;
+    final latestTs = latest['ts'];
 
     return {
       'period': 'last_7_days',
+      'source': 'local_device_samples',
+      'hasRealSensorData': true,
+      'dataQuality': samples.length < 6 ? 'limited_samples' : 'ok',
+      'from': start.toIso8601String(),
+      'to': now.toIso8601String(),
       'sampleCount': samples.length,
       'trackingMinutes': (samples.length * minutesPerSample).round(),
       'avgScore': avg.round().clamp(0, 100),
       'badPostureMinutes': (badCount.length * minutesPerSample).round(),
       'worstScore': scores.first.clamp(0, 100),
       'bestScore': scores.last.clamp(0, 100),
+      'latestSampleAt': latestTs is int
+          ? DateTime.fromMillisecondsSinceEpoch(
+              latestTs,
+              isUtc: true,
+            ).toLocal().toIso8601String()
+          : null,
+      'dailyBreakdown': dailyBreakdown,
     };
+  }
+
+  List<Map<String, dynamic>> _dailyBreakdown(
+    List<Map<String, dynamic>> samples,
+    DateTime start,
+    DateTime now,
+  ) {
+    const minutesPerSample = 0.5;
+    final days = <Map<String, dynamic>>[];
+    for (var i = 0; i < 7; i++) {
+      final dayStart = DateTime(start.year, start.month, start.day).add(
+        Duration(days: i),
+      );
+      final dayEnd = dayStart.add(const Duration(days: 1));
+      final daySamples = samples.where((sample) {
+        final ts = sample['ts'];
+        if (ts is! int) return false;
+        final at = DateTime.fromMillisecondsSinceEpoch(
+          ts,
+          isUtc: true,
+        ).toLocal();
+        return !at.isBefore(dayStart) && at.isBefore(dayEnd);
+      }).toList(growable: false);
+      if (daySamples.isEmpty) {
+        days.add({
+          'date': dayStart.toIso8601String().split('T').first,
+          'sampleCount': 0,
+          'trackingMinutes': 0,
+          'avgScore': 0,
+          'badPostureMinutes': 0,
+        });
+        continue;
+      }
+      final scores = daySamples.map((s) => s['score'] as int).toList();
+      final avg = scores.reduce((a, b) => a + b) / scores.length;
+      final bad = daySamples.where((s) => (s['state'] as int) >= 2).length;
+      days.add({
+        'date': dayStart.toIso8601String().split('T').first,
+        'sampleCount': daySamples.length,
+        'trackingMinutes': (daySamples.length * minutesPerSample).round(),
+        'avgScore': avg.round().clamp(0, 100),
+        'badPostureMinutes': (bad * minutesPerSample).round(),
+      });
+    }
+    return days;
   }
 
   Future<void> _send() async {
@@ -118,6 +212,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     if (text.isEmpty || threadId == null || _sending) return;
 
     _messageCtrl.clear();
+    final freshContext = await _buildPostureContext();
     final optimistic = {
       'role': 'user',
       'content': text,
@@ -126,6 +221,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 
     setState(() {
       _sending = true;
+      _postureContext = freshContext;
       _messages = [..._messages, optimistic];
     });
     _scrollToBottom();
@@ -138,7 +234,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           ..._messages,
           {
             'role': 'assistant',
-            'content': _localAssistantReply(text, _postureContext),
+            'content': _localAssistantReply(text, freshContext),
             'safety_level': _safetyLevelFor(text),
             'created_at': DateTime.now().toIso8601String(),
           },
@@ -153,7 +249,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       await Backend.sendAiChatMessage(
         threadId: threadId,
         message: text,
-        postureContext: _postureContext,
+        postureContext: freshContext,
         recentMessages: _messages.takeLast(8),
       );
       final messages = await Backend.loadAiMessages(threadId);
@@ -286,6 +382,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
         child: SafeArea(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
+              : _needsAiConsent
+              ? _AiConsentRequired(onAccept: _acceptAiConsent)
               : _error != null
               ? _SetupRequired(message: _error!, onRetry: _load)
               : Column(
@@ -351,6 +449,15 @@ class _ContextCard extends StatelessWidget {
     final avg = contextData['avgScore'] ?? 0;
     final tracking = contextData['trackingMinutes'] ?? 0;
     final bad = contextData['badPostureMinutes'] ?? 0;
+    final samples = contextData['sampleCount'] ?? 0;
+    final hasRealData = contextData['hasRealSensorData'] == true;
+    final quality = contextData['dataQuality']?.toString() ?? 'unknown';
+    final subtitle = hasRealData
+        ? 'Skor $avg/100 - Takip $tracking dk - Kotu postur $bad dk - $samples olcum'
+        : 'Henuz gercek sensor verisi yok; rapor icin cihazla takip baslat.';
+    final title = hasRealData && quality == 'limited_samples'
+        ? 'Son 7 gun ozeti - sinirli veri'
+        : 'Son 7 gun ozeti';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -373,13 +480,13 @@ class _ContextCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Son 7 gun ozeti',
+                    Text(
+                      title,
                       style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Skor $avg/100 - Takip $tracking dk - Kotu postur $bad dk',
+                      subtitle,
                       style: TextStyle(
                         color: cs.onSurface.withAlpha(170),
                         fontSize: 12,
@@ -427,6 +534,54 @@ class _LocalModeBanner extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AiConsentRequired extends StatelessWidget {
+  final VoidCallback onAccept;
+
+  const _AiConsentRequired({required this.onAccept});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.auto_awesome, color: cs.primary, size: 34),
+                const SizedBox(height: 12),
+                const Text(
+                  'AI Asistan Onayi',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'AI cevaplari bilgilendirme amaclidir; tani, tedavi, recete veya acil saglik hizmeti yerine gecmez. Ciddi agri, uyusma, guc kaybi, travma veya ani kotulesmede uzmana basvurmalisin.',
+                  style: TextStyle(
+                    color: cs.onSurface.withAlpha(180),
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: onAccept,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Okudum, kabul ediyorum'),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

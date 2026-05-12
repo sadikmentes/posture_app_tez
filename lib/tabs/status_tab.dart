@@ -105,23 +105,26 @@ class _StatusTabState extends State<StatusTab> {
   @override
   Widget build(BuildContext context) {
     final connected = ble.connectedDevice;
+    final isConnected = connected != null;
     final hasLiveState = ble.hasPostureData && ble.hasLiveData;
-    final displayState = connected == null ? PostureState.neutral : _state;
+    final displayState = isConnected ? _state : PostureState.neutral;
     final displayColor = _stateColor(displayState);
-    final displayTitle = connected == null
-        ? 'On izleme modu'
-        : _stateTitle(displayState);
-    final displayHint = connected == null
+    final displayTitle = !isConnected
+        ? 'Cihaz bagli degil'
+        : hasLiveState
+        ? _stateTitle(displayState)
+        : 'Veri bekleniyor';
+    final displayHint = !isConnected
         ? 'Canli veri icin once cihaz baglantisi yap.'
-        : _stateHint(displayState);
-    final summaryText = connected == null
+        : hasLiveState
+        ? _stateHint(displayState)
+        : 'Sensor verisi geldiginde postur skoru hesaplanacak.';
+    final summaryText = !isConnected
         ? 'Canli veri icin once cihaz baglantisi yap.'
         : hasLiveState
         ? ble.postureSummary
         : 'Canli veri bekleniyor';
-    final postureScore = connected == null || !hasLiveState
-        ? 100
-        : ble.postureScore;
+    final postureScore = isConnected && hasLiveState ? ble.postureScore : null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Durumum')),
@@ -192,6 +195,7 @@ class _StatusTabState extends State<StatusTab> {
               _PostureScoreCard(
                 state: displayState,
                 score: postureScore,
+                isConnected: isConnected,
                 hasLiveState: hasLiveState,
                 title: displayTitle,
                 hint: displayHint,
@@ -208,7 +212,8 @@ class _StatusTabState extends State<StatusTab> {
 
 class _PostureScoreCard extends StatelessWidget {
   final PostureState state;
-  final int score;
+  final int? score;
+  final bool isConnected;
   final bool hasLiveState;
   final String title;
   final String hint;
@@ -218,6 +223,7 @@ class _PostureScoreCard extends StatelessWidget {
   const _PostureScoreCard({
     required this.state,
     required this.score,
+    required this.isConnected,
     required this.hasLiveState,
     required this.title,
     required this.hint,
@@ -239,17 +245,19 @@ class _PostureScoreCard extends StatelessWidget {
   }
 
   String _scoreLabel() {
+    if (!isConnected) return 'Cihaz bagli degil';
     if (!hasLiveState) return 'Veri bekleniyor';
-    if (score >= 90) return 'Cok iyi';
-    if (score >= 75) return 'Iyi';
-    if (score >= 60) return 'Dikkat';
+    final value = score ?? 0;
+    if (value >= 90) return 'Cok iyi';
+    if (value >= 75) return 'Iyi';
+    if (value >= 60) return 'Dikkat';
     return 'Duzeltme gerekli';
   }
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final scoreValue = score.clamp(0, 100);
+    final scoreValue = score?.clamp(0, 100);
 
     return Card(
       child: Padding(
@@ -263,11 +271,12 @@ class _PostureScoreCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TweenAnimationBuilder<double>(
-              tween: Tween<double>(end: scoreValue.toDouble()),
+              tween: Tween<double>(end: (scoreValue ?? 0).toDouble()),
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
               builder: (context, value, _) {
                 final animatedScore = value.round().clamp(0, 100);
+                final hasScore = scoreValue != null && hasLiveState;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -275,7 +284,7 @@ class _PostureScoreCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '$animatedScore',
+                          hasScore ? '$animatedScore' : '--',
                           style: TextStyle(
                             color: color,
                             fontSize: 58,
@@ -287,7 +296,7 @@ class _PostureScoreCard extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 7),
                           child: Text(
-                            '/100',
+                            hasScore ? '/100' : '',
                             style: TextStyle(
                               color: onSurface.withAlpha(160),
                               fontSize: 18,
@@ -320,7 +329,7 @@ class _PostureScoreCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                       child: LinearProgressIndicator(
                         minHeight: 12,
-                        value: animatedScore / 100,
+                        value: hasScore ? animatedScore / 100 : 0,
                         backgroundColor: const Color(0xFFE6EAF2),
                         color: color,
                       ),

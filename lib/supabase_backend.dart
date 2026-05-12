@@ -91,6 +91,31 @@ class Backend {
     return profile;
   }
 
+  static Future<void> recordConsent({
+    String? userId,
+    required String consentKey,
+    required String version,
+    required bool granted,
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    if (!_initialized) return;
+    final id = userId ?? currentUser?.id;
+    if (id == null || id.isEmpty) return;
+
+    try {
+      await _db.from('user_consents').insert({
+        'user_id': id,
+        'consent_key': consentKey,
+        'version': version,
+        'granted': granted,
+        'metadata': metadata,
+      });
+    } catch (_) {
+      // Consent is still stored locally; older Supabase schemas may not have
+      // the optional audit table yet.
+    }
+  }
+
   static Future<void> upsertHealthProfile(
     UserHealthProfile healthProfile, {
     String? userId,
@@ -320,22 +345,6 @@ class Backend {
         .eq('thread_id', threadId)
         .order('created_at');
     return rows.map((row) => Map<String, dynamic>.from(row)).toList();
-  }
-
-  static Future<void> saveAiPostureAnalysis(Map<String, dynamic> analysis) {
-    if (!_initialized) return Future.value();
-    final user = currentUser;
-    if (user == null) return Future.value();
-
-    return _db.from('ai_posture_analyses').insert({
-      'user_id': user.id,
-      'score': analysis['score'],
-      'title': analysis['title'],
-      'summary': analysis['summary'],
-      'findings': analysis['findings'],
-      'exercises': analysis['exercises'],
-      'metrics': analysis['metrics'],
-    });
   }
 
   static Future<Map<String, dynamic>> ensureAiChatThread({

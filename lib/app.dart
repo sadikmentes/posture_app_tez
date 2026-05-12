@@ -49,14 +49,18 @@ class _BootstrapState extends State<Bootstrap> {
         await ls.LocalStorage.getCurrentAccountType();
 
     if (!mounted) return;
-    Navigator.pushReplacementNamed(
-      context,
-      loggedIn
-          ? accountType == "physiotherapist"
-                ? Routes.physiotherapistPortal
-                : Routes.shell
-          : Routes.login,
-    );
+    String route;
+    if (!loggedIn) {
+      route = Routes.login;
+    } else if (accountType == "physiotherapist") {
+      route = Routes.physiotherapistPortal;
+    } else {
+      final hasDevice = await ls.LocalStorage.getHasPostureDevice();
+      route = hasDevice == null ? Routes.deviceAvailability : Routes.shell;
+    }
+
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, route);
   }
 
   @override

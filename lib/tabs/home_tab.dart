@@ -5,12 +5,13 @@ import 'package:posture_app/ble/ble_manager.dart';
 import 'package:posture_app/pages/ai_assistant_page.dart';
 import 'package:posture_app/pages/exercise_page.dart';
 import 'package:posture_app/pages/nearby_physiotherapists_page.dart';
-import 'package:posture_app/pages/photo_posture_analysis_screen.dart';
 import 'package:posture_app/pages/reports_page.dart';
 import 'package:posture_app/ui/modern_background.dart';
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key});
+  final bool hasDevice;
+
+  const HomeTab({super.key, required this.hasDevice});
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -46,6 +47,66 @@ class _HomeTabState extends State<HomeTab> {
     final hasData = _ble.hasLiveData && _ble.hasPostureData;
     final score = hasData ? _ble.postureScore : null;
     final state = hasData ? _ble.postureState : null;
+
+    if (!widget.hasDevice) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Ana Sayfa')),
+        body: ModernBackground(
+          child: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+              children: [
+                const _NoDeviceHeaderBanner(),
+                const SizedBox(height: 16),
+                _ActionCard(
+                  title: 'Egzersiz',
+                  subtitle: 'Boyun • Sırt • Bel',
+                  icon: Icons.fitness_center,
+                  gradient: const [Color(0xFF15B88E), Color(0xFF0E7A80)],
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ExercisePage()),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ActionCard(
+                  title: 'Postür Asistanı',
+                  subtitle: 'AI ile rutin ve egzersiz önerisi',
+                  icon: Icons.auto_awesome,
+                  gradient: const [Color(0xFF7C5CFF), Color(0xFF3D6DFF)],
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AiAssistantPage()),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ActionCard(
+                  title: 'Yakın Fizyoterapist',
+                  subtitle: 'Yakın merkezler ve online destek',
+                  icon: Icons.local_hospital_outlined,
+                  gradient: const [Color(0xFF3D6DFF), Color(0xFF0E7A80)],
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NearbyPhysiotherapistsPage(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Cihaz eklersen canlı takip ve sensör raporları otomatik açılır.',
+                  style: TextStyle(
+                    color: cs.onSurface.withAlpha(130),
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ana Sayfa')),
@@ -101,20 +162,6 @@ class _HomeTabState extends State<HomeTab> {
               ),
               const SizedBox(height: 12),
 
-              _ActionCard(
-                title: 'Foto Postur Analizi',
-                subtitle: 'Kamera veya galeriden hizalama skoru',
-                icon: Icons.add_a_photo_outlined,
-                gradient: const [Color(0xFF3D6DFF), Color(0xFF15B88E)],
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PhotoPostureAnalysisScreen(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
               // ─── Fizyoterapist ───
               _ActionCard(
                 title: 'Yakın Fizyoterapist',
@@ -156,6 +203,58 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 // ── Üst banner ───────────────────────────────────────────────────────────────
+class _NoDeviceHeaderBanner extends StatelessWidget {
+  const _NoDeviceHeaderBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0E7A80), Color(0xFF3D6DFF)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x332644AA),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.self_improvement, color: Colors.white, size: 42),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Postür Rehberi',
+                  style: TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Cihaz olmadan egzersiz, AI asistan ve destek ozelliklerini kullanabilirsin.',
+                  style: TextStyle(color: Color(0xD9FFFFFF)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HeaderBanner extends StatelessWidget {
   final bool connected;
   final int? score;

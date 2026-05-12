@@ -46,9 +46,18 @@ class _LoginPageState extends State<LoginPage> {
       await ls.LocalStorage.setLoggedIn(true);
       await ls.LocalStorage.setCurrentAccount(type: role, email: email);
       if (!mounted) return;
+      if (role == 'physiotherapist') {
+        Navigator.pushReplacementNamed(context, Routes.physiotherapistPortal);
+        return;
+      }
+
+      final hasDevice = await ls.LocalStorage.getHasPostureDevice(
+        userEmail: email,
+      );
+      if (!mounted) return;
       Navigator.pushReplacementNamed(
         context,
-        role == 'physiotherapist' ? Routes.physiotherapistPortal : Routes.shell,
+        hasDevice == null ? Routes.deviceAvailability : Routes.shell,
       );
     } catch (e) {
       if (!mounted) return;

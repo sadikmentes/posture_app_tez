@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:posture_app/routes.dart';
+import 'package:posture_app/storage.dart' as ls;
+
 import '../device/device_page.dart';
 import '../tabs/account_tab.dart';
 import '../tabs/home_tab.dart';
@@ -13,15 +16,58 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int idx = 0;
+  bool _loading = true;
+  bool _hasDevice = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDevicePreference();
+  }
+
+  Future<void> _loadDevicePreference() async {
+    final hasDevice = await ls.LocalStorage.getHasPostureDevice();
+    if (!mounted) return;
+    if (hasDevice == null) {
+      Navigator.pushReplacementNamed(context, Routes.deviceAvailability);
+      return;
+    }
+    setState(() {
+      _hasDevice = hasDevice;
+      _loading = false;
+    });
+  }
+
+  Future<void> _openDeviceTab() async {
+    if (!_hasDevice) {
+      await ls.LocalStorage.setHasPostureDevice(true);
+    }
+    if (!mounted) return;
+    setState(() {
+      _hasDevice = true;
+      idx = 1;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      const HomeTab(),
-      const DevicePage(),
-      const StatusTab(),
-      AccountTab(onOpenDeviceTab: () => setState(() => idx = 1)),
-    ];
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final pages = _hasDevice
+        ? [
+            const HomeTab(hasDevice: true),
+            const DevicePage(),
+            const StatusTab(),
+            AccountTab(hasDevice: true, onOpenDeviceTab: _openDeviceTab),
+          ]
+        : [
+            const HomeTab(hasDevice: false),
+            AccountTab(hasDevice: false, onOpenDeviceTab: _openDeviceTab),
+          ];
+
+    if (idx >= pages.length) idx = pages.length - 1;
 
     return Scaffold(
       body: AnimatedSwitcher(
@@ -47,20 +93,22 @@ class _MainShellState extends State<MainShell> {
           child: NavigationBar(
             selectedIndex: idx,
             onDestinationSelected: (i) => setState(() => idx = i),
-            destinations: const [
-              NavigationDestination(
+            destinations: [
+              const NavigationDestination(
                 icon: Icon(Icons.home_outlined),
                 label: "Ana",
               ),
-              NavigationDestination(
-                icon: Icon(Icons.bluetooth),
-                label: "Cihazım",
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.insights_outlined),
-                label: "Durumum",
-              ),
-              NavigationDestination(
+              if (_hasDevice) ...const [
+                NavigationDestination(
+                  icon: Icon(Icons.bluetooth),
+                  label: "Cihazım",
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.insights_outlined),
+                  label: "Durumum",
+                ),
+              ],
+              const NavigationDestination(
                 icon: Icon(Icons.person_outline),
                 label: "Hesabım",
               ),

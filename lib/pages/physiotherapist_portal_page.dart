@@ -14,24 +14,16 @@ class PhysiotherapistPortalPage extends StatefulWidget {
       _PhysiotherapistPortalPageState();
 }
 
-class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage>
-    with SingleTickerProviderStateMixin {
+class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage> {
   Map<String, dynamic>? _profile;
   List<Map<String, dynamic>> _requests = const [];
   bool _loading = true;
-  late TabController _tabController;
+  int _selectedFilter = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _load();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -64,7 +56,7 @@ class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage>
           currentRole: 'physiotherapist',
           currentName: _profile!['full_name']?.toString() ?? 'Fizyoterapist',
           currentEmail: _profile!['email']?.toString() ?? '',
-          peerName: request['user_name']?.toString() ?? 'Danışan',
+          peerName: request['user_name']?.toString() ?? 'Danisan',
           peerEmail: request['user_email']?.toString() ?? '',
         ),
       ),
@@ -85,6 +77,30 @@ class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage>
   List<Map<String, dynamic>> get _done =>
       _requests.where((r) => r['status'] == 'done').toList();
 
+  List<Map<String, dynamic>> get _visibleRequests {
+    return switch (_selectedFilter) {
+      1 => _active,
+      2 => _done,
+      _ => _new,
+    };
+  }
+
+  String get _emptyLabel {
+    return switch (_selectedFilter) {
+      1 => 'Aktif danisan yok.',
+      2 => 'Henuz tamamlanan talep yok.',
+      _ => 'Yeni talep yok.',
+    };
+  }
+
+  IconData get _emptyIcon {
+    return switch (_selectedFilter) {
+      1 => Icons.forum_outlined,
+      2 => Icons.check_circle_outline,
+      _ => Icons.inbox_outlined,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,7 +115,7 @@ class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage>
           IconButton(
             onPressed: _logout,
             icon: const Icon(Icons.logout_outlined),
-            tooltip: 'Çıkış Yap',
+            tooltip: 'Cikis Yap',
           ),
         ],
       ),
@@ -113,17 +129,21 @@ class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage>
                   children: [
                     _ProfileHeader(profile: _profile),
                     const SizedBox(height: 14),
-                    _StatsRow(
+                    _StatsPanel(
                       newCount: _new.length,
                       activeCount: _active.length,
                       doneCount: _done.length,
                     ),
                     const SizedBox(height: 16),
-                    _RequestsSection(
-                      tabController: _tabController,
-                      newRequests: _new,
-                      activeRequests: _active,
-                      doneRequests: _done,
+                    _RequestsPanel(
+                      selectedIndex: _selectedFilter,
+                      onSelected: (index) {
+                        setState(() => _selectedFilter = index);
+                      },
+                      counts: [_new.length, _active.length, _done.length],
+                      requests: _visibleRequests,
+                      emptyLabel: _emptyLabel,
+                      emptyIcon: _emptyIcon,
                       onAccept: (id) => _setStatus(id, 'accepted'),
                       onDone: (id) => _setStatus(id, 'done'),
                       onMessage: _openChat,
@@ -131,7 +151,7 @@ class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage>
                     const SizedBox(height: 16),
                     _ProfileInfoCard(profile: _profile),
                     const SizedBox(height: 12),
-                    _ToolsCard(profile: _profile),
+                    _PracticeCard(profile: _profile),
                   ],
                 ),
               ),
@@ -140,14 +160,13 @@ class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage>
   }
 }
 
-// ── Profil başlığı ────────────────────────────────────────────────────────────
 class _ProfileHeader extends StatelessWidget {
   final Map<String, dynamic>? profile;
   const _ProfileHeader({required this.profile});
 
   String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
     return name.isNotEmpty ? name[0].toUpperCase() : 'F';
@@ -156,45 +175,36 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = profile?['full_name']?.toString() ?? 'Fizyoterapist';
-    final clinic = profile?['clinic_name']?.toString() ?? '';
-    final specialty = profile?['specialty']?.toString() ?? '';
+    final clinic = profile?['clinic_name']?.toString() ?? 'Klinik profili';
+    final specialty = profile?['specialty']?.toString() ?? 'Postur ve egzersiz';
     final online = profile?['online_consultation'] == true;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0E7A80), Color(0xFF3D6DFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x440E7A80),
-            blurRadius: 20,
-            offset: Offset(0, 8),
+            color: Theme.of(context).colorScheme.shadow.withAlpha(16),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withAlpha(40),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withAlpha(80), width: 2),
-            ),
-            child: Center(
-              child: Text(
-                _initials(name),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                ),
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: const Color(0xFF0E7A80).withAlpha(24),
+            child: Text(
+              _initials(name),
+              style: const TextStyle(
+                color: Color(0xFF0E7A80),
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
@@ -205,47 +215,51 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 Text(
                   name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
+                    fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                if (clinic.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    clinic,
-                    style: const TextStyle(
-                      color: Color(0xE0FFFFFF),
-                      fontSize: 13,
-                    ),
+                const SizedBox(height: 3),
+                Text(
+                  clinic,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withAlpha(170),
+                    fontWeight: FontWeight.w700,
                   ),
-                ],
-                if (specialty.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    specialty,
-                    style: const TextStyle(
-                      color: Color(0xBBFFFFFF),
-                      fontSize: 12,
-                    ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  specialty,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withAlpha(145),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
+                ),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    _HeaderBadge(
+                    const _StatusPill(
                       icon: Icons.verified_outlined,
-                      label: 'Kayıtlı Uzman',
-                      color: const Color(0xFFFFD54F),
+                      label: 'Kayitli uzman',
+                      color: Color(0xFF0E7A80),
                     ),
-                    if (online)
-                      _HeaderBadge(
-                        icon: Icons.video_call_outlined,
-                        label: 'Online Görüşme',
-                        color: const Color(0xFF69F0AE),
-                      ),
+                    _StatusPill(
+                      icon: online
+                          ? Icons.video_call_outlined
+                          : Icons.videocam_off_outlined,
+                      label: online ? 'Online aktif' : 'Online kapali',
+                      color: online ? const Color(0xFF15B88E) : Colors.grey,
+                    ),
                   ],
                 ),
               ],
@@ -257,11 +271,12 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
-class _HeaderBadge extends StatelessWidget {
+class _StatusPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _HeaderBadge({
+
+  const _StatusPill({
     required this.icon,
     required this.label,
     required this.color,
@@ -270,23 +285,23 @@ class _HeaderBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(25),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withAlpha(50)),
+        color: color.withAlpha(18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withAlpha(70)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 12),
-          const SizedBox(width: 4),
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
           Text(
             label,
             style: TextStyle(
               color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -295,13 +310,12 @@ class _HeaderBadge extends StatelessWidget {
   }
 }
 
-// ── İstatistik satırı ─────────────────────────────────────────────────────────
-class _StatsRow extends StatelessWidget {
+class _StatsPanel extends StatelessWidget {
   final int newCount;
   final int activeCount;
   final int doneCount;
 
-  const _StatsRow({
+  const _StatsPanel({
     required this.newCount,
     required this.activeCount,
     required this.doneCount,
@@ -309,112 +323,130 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _StatCard(
-          icon: Icons.inbox_outlined,
-          label: 'Yeni Talep',
-          value: '$newCount',
-          gradient: const [Color(0xFFFF8A5B), Color(0xFFFFB36B)],
-          shadowColor: const Color(0xFFFF8A5B),
-        ),
-        const SizedBox(width: 10),
-        _StatCard(
-          icon: Icons.forum_outlined,
-          label: 'Aktif',
-          value: '$activeCount',
-          gradient: const [Color(0xFF3D6DFF), Color(0xFF7C5CFF)],
-          shadowColor: const Color(0xFF3D6DFF),
-        ),
-        const SizedBox(width: 10),
-        _StatCard(
-          icon: Icons.check_circle_outline,
-          label: 'Tamamlandı',
-          value: '$doneCount',
-          gradient: const [Color(0xFF15B88E), Color(0xFF0E7A80)],
-          shadowColor: const Color(0xFF15B88E),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 380;
+        final thirdWidth = (constraints.maxWidth - 20) / 3;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _StatCard(
+              width: compact ? (constraints.maxWidth - 10) / 2 : thirdWidth,
+              icon: Icons.inbox_outlined,
+              label: 'Yeni',
+              value: '$newCount',
+              color: const Color(0xFFFF8A5B),
+            ),
+            _StatCard(
+              width: compact ? (constraints.maxWidth - 10) / 2 : thirdWidth,
+              icon: Icons.forum_outlined,
+              label: 'Aktif',
+              value: '$activeCount',
+              color: const Color(0xFF3D6DFF),
+            ),
+            _StatCard(
+              width: compact ? constraints.maxWidth : thirdWidth,
+              icon: Icons.check_circle_outline,
+              label: 'Tamamlanan',
+              value: '$doneCount',
+              color: const Color(0xFF15B88E),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 class _StatCard extends StatelessWidget {
+  final double? width;
   final IconData icon;
   final String label;
   final String value;
-  final List<Color> gradient;
-  final Color shadowColor;
+  final Color color;
 
   const _StatCard({
+    required this.width,
     required this.icon,
     required this.label,
     required this.value,
-    required this.gradient,
-    required this.shadowColor,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: gradient),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor.withAlpha(60),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+    final card = Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withAlpha(18),
+              borderRadius: BorderRadius.circular(10),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Colors.white, size: 22),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                height: 1,
-              ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withAlpha(150),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xDDFFFFFF),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+
+    return SizedBox(width: width, child: card);
   }
 }
 
-// ── Talepler bölümü ───────────────────────────────────────────────────────────
-class _RequestsSection extends StatelessWidget {
-  final TabController tabController;
-  final List<Map<String, dynamic>> newRequests;
-  final List<Map<String, dynamic>> activeRequests;
-  final List<Map<String, dynamic>> doneRequests;
+class _RequestsPanel extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final List<int> counts;
+  final List<Map<String, dynamic>> requests;
+  final String emptyLabel;
+  final IconData emptyIcon;
   final ValueChanged<String> onAccept;
   final ValueChanged<String> onDone;
   final ValueChanged<Map<String, dynamic>> onMessage;
 
-  const _RequestsSection({
-    required this.tabController,
-    required this.newRequests,
-    required this.activeRequests,
-    required this.doneRequests,
+  const _RequestsPanel({
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.counts,
+    required this.requests,
+    required this.emptyLabel,
+    required this.emptyIcon,
     required this.onAccept,
     required this.onDone,
     required this.onMessage,
@@ -422,148 +454,122 @@ class _RequestsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.people_alt_outlined, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'Danışan Talepleri',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+            Row(
+              children: [
+                Icon(
+                  Icons.people_alt_outlined,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Danisan Talepleri',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _FilterChips(
+              selectedIndex: selectedIndex,
+              counts: counts,
+              onSelected: onSelected,
+            ),
+            const SizedBox(height: 12),
+            _RequestList(
+              requests: requests,
+              emptyLabel: emptyLabel,
+              emptyIcon: emptyIcon,
+              onAccept: onAccept,
+              onDone: onDone,
+              onMessage: onMessage,
             ),
           ],
         ),
-        const SizedBox(height: 10),
-        Card(
-          child: Column(
-            children: [
-              TabBar(
-                controller: tabController,
-                tabs: [
-                  _TabWithBadge(
-                    label: 'Yeni',
-                    count: newRequests.length,
-                    badgeColor: const Color(0xFFFF8A5B),
-                  ),
-                  _TabWithBadge(label: 'Aktif', count: activeRequests.length),
-                  _TabWithBadge(label: 'Tamamlanan', count: doneRequests.length),
-                ],
-              ),
-              SizedBox(
-                height: 340,
-                child: TabBarView(
-                  controller: tabController,
-                  children: [
-                    _RequestList(
-                      requests: newRequests,
-                      onAccept: onAccept,
-                      onDone: onDone,
-                      onMessage: onMessage,
-                      emptyLabel: 'Yeni talep yok.',
-                      emptyIcon: Icons.inbox_outlined,
-                    ),
-                    _RequestList(
-                      requests: activeRequests,
-                      onAccept: onAccept,
-                      onDone: onDone,
-                      onMessage: onMessage,
-                      emptyLabel: 'Aktif danışan yok.',
-                      emptyIcon: Icons.forum_outlined,
-                    ),
-                    _RequestList(
-                      requests: doneRequests,
-                      onAccept: onAccept,
-                      onDone: onDone,
-                      onMessage: onMessage,
-                      emptyLabel: 'Henüz tamamlanan talep yok.',
-                      emptyIcon: Icons.check_circle_outline,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _TabWithBadge extends StatelessWidget {
-  final String label;
-  final int count;
-  final Color? badgeColor;
-  const _TabWithBadge({required this.label, required this.count, this.badgeColor});
+class _FilterChips extends StatelessWidget {
+  final int selectedIndex;
+  final List<int> counts;
+  final ValueChanged<int> onSelected;
+
+  const _FilterChips({
+    required this.selectedIndex,
+    required this.counts,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Tab(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label),
-          if (count > 0) ...[
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: badgeColor ?? Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+    final labels = ['Yeni', 'Aktif', 'Tamamlanan'];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (var i = 0; i < labels.length; i++)
+          ChoiceChip(
+            selected: selectedIndex == i,
+            label: Text('${labels[i]} (${counts[i]})'),
+            onSelected: (_) => onSelected(i),
+          ),
+      ],
     );
   }
 }
 
 class _RequestList extends StatelessWidget {
   final List<Map<String, dynamic>> requests;
+  final String emptyLabel;
+  final IconData emptyIcon;
   final ValueChanged<String> onAccept;
   final ValueChanged<String> onDone;
   final ValueChanged<Map<String, dynamic>> onMessage;
-  final String emptyLabel;
-  final IconData emptyIcon;
 
   const _RequestList({
     required this.requests,
+    required this.emptyLabel,
+    required this.emptyIcon,
     required this.onAccept,
     required this.onDone,
     required this.onMessage,
-    required this.emptyLabel,
-    required this.emptyIcon,
   });
 
   @override
   Widget build(BuildContext context) {
     if (requests.isEmpty) {
-      return Center(
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest
+              .withAlpha(90),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               emptyIcon,
-              size: 40,
-              color: Theme.of(context).colorScheme.onSurface.withAlpha(70),
+              size: 34,
+              color: Theme.of(context).colorScheme.onSurface.withAlpha(85),
             ),
             const SizedBox(height: 10),
             Text(
               emptyLabel,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withAlpha(140),
-                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(150),
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -571,19 +577,18 @@ class _RequestList extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: requests.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final req = requests[i];
-        return _RequestCard(
-          request: req,
-          onAccept: () => onAccept(req['id']?.toString() ?? ''),
-          onDone: () => onDone(req['id']?.toString() ?? ''),
-          onMessage: () => onMessage(req),
-        );
-      },
+    return Column(
+      children: [
+        for (var i = 0; i < requests.length; i++) ...[
+          _RequestCard(
+            request: requests[i],
+            onAccept: () => onAccept(requests[i]['id']?.toString() ?? ''),
+            onDone: () => onDone(requests[i]['id']?.toString() ?? ''),
+            onMessage: () => onMessage(requests[i]),
+          ),
+          if (i != requests.length - 1) const SizedBox(height: 10),
+        ],
+      ],
     );
   }
 }
@@ -602,8 +607,8 @@ class _RequestCard extends StatelessWidget {
   });
 
   String _initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
     return name.isNotEmpty ? name[0].toUpperCase() : 'D';
@@ -612,12 +617,11 @@ class _RequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = request['status']?.toString() ?? 'new';
-    final name = request['user_name']?.toString() ?? 'Danışan';
+    final name = request['user_name']?.toString() ?? 'Danisan';
     final message = request['message']?.toString() ?? '';
     final phone = request['user_phone']?.toString() ?? '';
     final id = request['id']?.toString() ?? '';
     final cs = Theme.of(context).colorScheme;
-
     final statusColor = switch (status) {
       'accepted' => const Color(0xFF3D6DFF),
       'done' => const Color(0xFF15B88E),
@@ -625,256 +629,143 @@ class _RequestCard extends StatelessWidget {
     };
     final statusLabel = switch (status) {
       'accepted' => 'Aktif',
-      'done' => 'Tamamlandı',
+      'done' => 'Tamamlandi',
       _ => 'Yeni',
     };
 
     return Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withAlpha(12),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Sol durum çizgisi
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: statusColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(14),
-                  bottomLeft: Radius.circular(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 21,
+                backgroundColor: statusColor.withAlpha(20),
+                child: Text(
+                  _initials(name),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
+              const SizedBox(width: 10),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: statusColor.withAlpha(20),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              _initials(name),
-                              style: TextStyle(
-                                color: statusColor,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              if (phone.isNotEmpty && phone != '-')
-                                Text(
-                                  phone,
-                                  style: TextStyle(
-                                    color: cs.onSurface.withAlpha(160),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withAlpha(18),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            statusLabel,
-                            style: TextStyle(
-                              color: statusColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
                     ),
-                    if (message.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: cs.onSurface.withAlpha(8),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          message,
-                          style: TextStyle(
-                            color: cs.onSurface.withAlpha(195),
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                    if (phone.isNotEmpty && phone != '-')
+                      Text(
+                        phone,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: cs.onSurface.withAlpha(145),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _ActionBtn(
-                          label: 'Mesaj',
-                          icon: Icons.chat_bubble_outline,
-                          filled: true,
-                          color: cs.primary,
-                          onPressed: onMessage,
-                        ),
-                        const SizedBox(width: 6),
-                        if (status == 'new' && id.isNotEmpty)
-                          _ActionBtn(
-                            label: 'Kabul Et',
-                            icon: Icons.check_outlined,
-                            filled: false,
-                            color: const Color(0xFF3D6DFF),
-                            onPressed: onAccept,
-                          ),
-                        if (status == 'accepted' && id.isNotEmpty)
-                          _ActionBtn(
-                            label: 'Tamamla',
-                            icon: Icons.done_all_outlined,
-                            filled: false,
-                            color: const Color(0xFF15B88E),
-                            onPressed: onDone,
-                          ),
-                      ],
-                    ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _StatusPill(
+                icon: Icons.circle,
+                label: statusLabel,
+                color: statusColor,
+              ),
+            ],
+          ),
+          if (message.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withAlpha(90),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                message,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: cs.onSurface.withAlpha(185),
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
                 ),
               ),
             ),
           ],
-        ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: onMessage,
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: const Text('Mesaj'),
+              ),
+              if (status == 'new' && id.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: onAccept,
+                  icon: const Icon(Icons.check_outlined, size: 16),
+                  label: const Text('Kabul et'),
+                ),
+              if (status == 'accepted' && id.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: onDone,
+                  icon: const Icon(Icons.done_all_outlined, size: 16),
+                  label: const Text('Tamamla'),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ActionBtn extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool filled;
-  final Color color;
-  final VoidCallback onPressed;
-
-  const _ActionBtn({
-    required this.label,
-    required this.icon,
-    required this.filled,
-    required this.color,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final style = ButtonStyle(
-      padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      ),
-      minimumSize: const WidgetStatePropertyAll(Size.zero),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      textStyle: const WidgetStatePropertyAll(
-        TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-      ),
-    );
-
-    if (filled) {
-      return FilledButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 15),
-        label: Text(label),
-        style: style.copyWith(
-          backgroundColor: WidgetStatePropertyAll(color),
-        ),
-      );
-    }
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 15, color: color),
-      label: Text(label, style: TextStyle(color: color)),
-      style: style.copyWith(
-        side: WidgetStatePropertyAll(
-          BorderSide(color: color.withAlpha(150)),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Profil bilgileri kartı ────────────────────────────────────────────────────
 class _ProfileInfoCard extends StatelessWidget {
   final Map<String, dynamic>? profile;
   const _ProfileInfoCard({required this.profile});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Card(
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: cs.primary.withAlpha(18),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.badge_outlined, color: cs.primary, size: 20),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Profil Bilgileri',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                ),
-              ],
+            const _SectionTitle(
+              icon: Icons.badge_outlined,
+              title: 'Profil Bilgileri',
             ),
             const SizedBox(height: 14),
             _InfoRow(
               icon: Icons.local_hospital_outlined,
-              label: 'Uzmanlık',
+              label: 'Uzmanlik',
               value: profile?['specialty']?.toString() ?? '-',
             ),
             _InfoRow(
@@ -884,7 +775,7 @@ class _ProfileInfoCard extends StatelessWidget {
             ),
             _InfoRow(
               icon: Icons.schedule_outlined,
-              label: 'Çalışma Saatleri',
+              label: 'Calisma saatleri',
               value: profile?['working_hours']?.toString() ?? '-',
             ),
             _InfoRow(
@@ -906,6 +797,38 @@ class _ProfileInfoCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+
+  const _SectionTitle({required this.icon, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: cs.primary.withAlpha(18),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: cs.primary, size: 19),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -933,21 +856,28 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: cs.primary.withAlpha(180)),
           const SizedBox(width: 10),
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: cs.onSurface.withAlpha(155),
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
-          ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: cs.onSurface.withAlpha(145),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value.isEmpty ? '-' : value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -956,10 +886,9 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-// ── Klinik araçları ───────────────────────────────────────────────────────────
-class _ToolsCard extends StatelessWidget {
+class _PracticeCard extends StatelessWidget {
   final Map<String, dynamic>? profile;
-  const _ToolsCard({required this.profile});
+  const _PracticeCard({required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -967,60 +896,38 @@ class _ToolsCard extends StatelessWidget {
     final hours = profile?['working_hours']?.toString() ?? '-';
 
     return Card(
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3D6DFF).withAlpha(18),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.medical_information_outlined,
-                    color: Color(0xFF3D6DFF),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Klinik Araçları',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                ),
-              ],
+            const _SectionTitle(
+              icon: Icons.medical_information_outlined,
+              title: 'Klinik Akis',
             ),
             const SizedBox(height: 14),
-            _ToolItem(
+            _PracticeItem(
               icon: Icons.calendar_today_outlined,
-              title: 'Randevu Takibi',
-              subtitle: 'Çalışma saatleri: $hours',
+              title: 'Randevu ve musaitlik',
+              subtitle: 'Calisma saatleri: $hours',
               color: const Color(0xFF3D6DFF),
             ),
-            _ToolItem(
+            _PracticeItem(
               icon: Icons.note_alt_outlined,
-              title: 'Danışan Notları',
-              subtitle: 'Her talebin mesaj ekranında not alabilirsin.',
+              title: 'Danisan notlari',
+              subtitle: 'Sohbet uzerinden takip ve bilgilendirme yap.',
               color: const Color(0xFFFF8A5B),
             ),
-            _ToolItem(
-              icon: Icons.fitness_center_outlined,
-              title: 'Egzersiz Reçetesi',
-              subtitle: 'Danışana kişisel egzersiz programı ilet.',
-              color: const Color(0xFF15B88E),
-            ),
-            _ToolItem(
+            _PracticeItem(
               icon: online
                   ? Icons.video_call_outlined
                   : Icons.videocam_off_outlined,
-              title: 'Online Görüşme',
+              title: 'Online gorusme',
               subtitle: online
-                  ? 'Profilinde online görüşme aktif.'
-                  : 'Profilinde online görüşme kapalı.',
-              color: online ? const Color(0xFF0E7A80) : Colors.grey,
+                  ? 'Profilinde online gorusme aktif.'
+                  : 'Profilinde online gorusme kapali.',
+              color: online ? const Color(0xFF15B88E) : Colors.grey,
               isLast: true,
             ),
           ],
@@ -1030,14 +937,14 @@ class _ToolsCard extends StatelessWidget {
   }
 }
 
-class _ToolItem extends StatelessWidget {
+class _PracticeItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final bool isLast;
 
-  const _ToolItem({
+  const _PracticeItem({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -1070,7 +977,7 @@ class _ToolItem extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                     fontSize: 14,
                   ),
                 ),
@@ -1081,6 +988,7 @@ class _ToolItem extends StatelessWidget {
                     color: cs.onSurface.withAlpha(160),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
+                    height: 1.3,
                   ),
                 ),
               ],

@@ -10,9 +10,14 @@ import '../pages/privacy_settings_page.dart';
 import '../routes.dart';
 
 class AccountTab extends StatefulWidget {
-  final VoidCallback onOpenDeviceTab;
+  final bool hasDevice;
+  final Future<void> Function() onOpenDeviceTab;
 
-  const AccountTab({super.key, required this.onOpenDeviceTab});
+  const AccountTab({
+    super.key,
+    required this.hasDevice,
+    required this.onOpenDeviceTab,
+  });
 
   @override
   State<AccountTab> createState() => _AccountTabState();
@@ -83,69 +88,7 @@ class _AccountTabState extends State<AccountTab> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFF8A5B), Color(0xFF3D6DFF)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: Colors.white.withAlpha(36),
-                            child: const Icon(
-                              Icons.person_outline,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  (user?['full_name'] ?? 'Kullanıcı') as String,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  (user?['email'] ?? '-') as String,
-                                  style: const TextStyle(
-                                    color: Color(0xE6FFFFFF),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 6,
-                                  children: [
-                                    _InfoChip(
-                                      icon: Icons.cake_outlined,
-                                      text: 'Yaş: ${user?['age'] ?? '-'}',
-                                    ),
-                                    _InfoChip(
-                                      icon: Icons.wc_outlined,
-                                      text:
-                                          'Cinsiyet: ${user?['gender'] ?? '-'}',
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _ProfileHeader(user: user),
                     const SizedBox(height: 14),
                     Text(
                       'Ayarlar',
@@ -170,15 +113,19 @@ class _AccountTabState extends State<AccountTab> {
                     ),
                     _SettingsTile(
                       icon: Icons.bluetooth_outlined,
-                      title: 'Cihaz Bağlantısı',
-                      subtitle: 'Bluetooth cihazlarını yönet',
+                      title: widget.hasDevice
+                          ? 'Cihaz Bağlantısı'
+                          : 'Cihaz Ekle',
+                      subtitle: widget.hasDevice
+                          ? 'Bluetooth cihazlarını yönet'
+                          : 'Dik duruş cihazın varsa buradan ekle',
                       color: const Color(0xFF15B88E),
                       onTap: widget.onOpenDeviceTab,
                     ),
                     _SettingsTile(
                       icon: Icons.auto_awesome,
-                      title: 'Postur Asistani',
-                      subtitle: 'AI destekli postur ve egzersiz rehberi',
+                      title: 'Postür Asistanı',
+                      subtitle: 'AI destekli postür ve egzersiz rehberi',
                       color: const Color(0xFF7C5CFF),
                       onTap: _openAssistant,
                     ),
@@ -206,122 +153,72 @@ class _AccountTabState extends State<AccountTab> {
   }
 }
 
-// ignore: unused_element
-class _MyRequestsCard extends StatelessWidget {
-  final List<Map<String, dynamic>> requests;
-  final ValueChanged<Map<String, dynamic>> onOpenChat;
+class _ProfileHeader extends StatelessWidget {
+  final Map<String, dynamic>? user;
 
-  const _MyRequestsCard({required this.requests, required this.onOpenChat});
+  const _ProfileHeader({required this.user});
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF8A5B), Color(0xFF3D6DFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white.withAlpha(36),
+            child: const Icon(
+              Icons.person_outline,
+              color: Colors.white,
+              size: 30,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.assignment_outlined),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Fizyoterapist Taleplerim',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                Text(
+                  (user?['full_name'] ?? user?['fullName'] ?? 'Kullanıcı')
+                      .toString(),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  '${requests.length}',
-                  style: TextStyle(
-                    color: onSurface.withAlpha(170),
-                    fontWeight: FontWeight.w900,
-                  ),
+                  (user?['email'] ?? '-').toString(),
+                  style: const TextStyle(color: Color(0xE6FFFFFF)),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _InfoChip(
+                      icon: Icons.cake_outlined,
+                      text: 'Yaş: ${user?['age'] ?? '-'}',
+                    ),
+                    _InfoChip(
+                      icon: Icons.wc_outlined,
+                      text: 'Cinsiyet: ${user?['gender'] ?? '-'}',
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            if (requests.isEmpty)
-              Text(
-                'Henüz gönderilmiş talep yok.',
-                style: TextStyle(color: onSurface.withAlpha(170)),
-              )
-            else
-              ...requests.take(3).map((request) {
-                final status = request['status']?.toString() ?? 'new';
-                final color = switch (status) {
-                  'accepted' => const Color(0xFF3D6DFF),
-                  'done' => const Color(0xFF15B88E),
-                  _ => const Color(0xFFFF8A5B),
-                };
-                final label = switch (status) {
-                  'accepted' => 'Kabul edildi',
-                  'done' => 'Tamamlandı',
-                  _ => 'Yeni',
-                };
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => onOpenChat(request),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  request['physiotherapist_name']?.toString() ??
-                                      'Fizyoterapist',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Text(
-                                  'Sohbeti ac',
-                                  style: TextStyle(
-                                    color: onSurface.withAlpha(130),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: color.withAlpha(24),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                color: color,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.chevron_right,
-                            color: onSurface.withAlpha(120),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
