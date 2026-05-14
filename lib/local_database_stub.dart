@@ -12,11 +12,13 @@ class LocalDatabase {
   final Map<int, Map<String, dynamic>> _devices = <int, Map<String, dynamic>>{};
   final Map<int, Map<String, dynamic>> _sessions =
       <int, Map<String, dynamic>>{};
+  final List<Map<String, dynamic>> _exerciseLogs = <Map<String, dynamic>>[];
   final Map<String, UserHealthProfile> _healthProfiles =
       <String, UserHealthProfile>{};
   var _nextDeviceId = 1;
   var _nextSessionId = 1;
   var _nextSampleId = 1;
+  var _nextExerciseLogId = 1;
   var _legacyImported = false;
 
   Future<void> upsertUser({
@@ -202,6 +204,49 @@ class LocalDatabase {
 
   Future<void> clearPostureSamples() async {
     _samples.clear();
+  }
+
+  Future<void> insertExerciseLog({
+    required String userEmail,
+    required String exerciseCode,
+    required String exerciseTitle,
+    required int durationSeconds,
+    DateTime? completedAt,
+  }) async {
+    final completed = completedAt ?? DateTime.now();
+    _exerciseLogs.add({
+      'id': _nextExerciseLogId++,
+      'userEmail': _normalizeEmail(userEmail),
+      'exerciseCode': exerciseCode,
+      'exerciseTitle': exerciseTitle,
+      'durationSeconds': durationSeconds,
+      'completedAt': completed.toUtc().millisecondsSinceEpoch,
+      'createdAt': DateTime.now().toUtc().millisecondsSinceEpoch,
+    });
+    _exerciseLogs.sort(
+      (a, b) => (b['completedAt'] as int).compareTo(a['completedAt'] as int),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> loadExerciseLogs({
+    required String userEmail,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final normalized = _normalizeEmail(userEmail);
+    final fromMs = from?.toUtc().millisecondsSinceEpoch;
+    final toMs = to?.toUtc().millisecondsSinceEpoch;
+
+    return _exerciseLogs
+        .where((log) {
+          final completedAt = log['completedAt'] as int;
+          if (log['userEmail'] != normalized) return false;
+          if (fromMs != null && completedAt < fromMs) return false;
+          if (toMs != null && completedAt >= toMs) return false;
+          return true;
+        })
+        .map((log) => Map<String, dynamic>.from(log))
+        .toList(growable: false);
   }
 
   Map<String, dynamic> _normalizeSample(Map<String, dynamic> sample) {

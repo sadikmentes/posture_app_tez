@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:posture_app/pages/chat_page.dart';
+import 'package:posture_app/services/posture_alert_service.dart';
 import 'package:posture_app/storage.dart' as ls;
 import 'package:posture_app/supabase_backend.dart';
 import 'package:posture_app/ui/modern_background.dart';
@@ -64,6 +65,7 @@ class _PhysiotherapistPortalPageState extends State<PhysiotherapistPortalPage> {
   }
 
   Future<void> _logout() async {
+    await PostureAlertService.I.suspend();
     await ls.LocalStorage.logout();
     await Backend.signOut();
     if (!mounted) return;
@@ -228,7 +230,9 @@ class _ProfileHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withAlpha(170),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(170),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -238,7 +242,9 @@ class _ProfileHeader extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withAlpha(145),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(145),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -413,7 +419,9 @@ class _StatCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withAlpha(150),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(150),
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -552,8 +560,9 @@ class _RequestList extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest
-              .withAlpha(90),
+          color: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest.withAlpha(90),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(

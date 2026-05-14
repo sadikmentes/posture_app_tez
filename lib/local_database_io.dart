@@ -12,7 +12,7 @@ class LocalDatabase {
   static final LocalDatabase I = LocalDatabase._();
 
   static const _dbName = 'posture_app.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
   static const anonymousUser = 'local';
 
   Database? _db;
@@ -134,6 +134,7 @@ class LocalDatabase {
         id integer primary key autoincrement,
         user_email text not null,
         exercise_code text not null,
+        exercise_title text,
         duration_seconds integer,
         completed_at_ms integer not null,
         created_at_ms integer not null,
@@ -153,6 +154,9 @@ class LocalDatabase {
     await db.execute(
       'create index idx_posture_daily_user_day on posture_daily_stats(user_email, day_yyyymmdd)',
     );
+    await db.execute(
+      'create index idx_exercise_logs_user_completed on exercise_logs(user_email, completed_at_ms desc)',
+    );
 
     await _createHealthProfileSchema(db);
   }
@@ -164,6 +168,9 @@ class LocalDatabase {
   ) async {
     if (oldVersion < 2) {
       await _createHealthProfileSchema(db);
+    }
+    if (oldVersion < 3) {
+      await _createExerciseLogSchema(db);
     }
   }
 
@@ -197,6 +204,35 @@ class LocalDatabase {
 
     await db.execute(
       'create index if not exists idx_health_profiles_risk on user_health_profiles(risk_level)',
+    );
+  }
+
+  Future<void> _createExerciseLogSchema(Database db) async {
+    await db.execute('''
+      create table if not exists exercise_logs (
+        id integer primary key autoincrement,
+        user_email text not null,
+        exercise_code text not null,
+        exercise_title text,
+        duration_seconds integer,
+        completed_at_ms integer not null,
+        created_at_ms integer not null,
+        synced_at_ms integer
+      )
+    ''');
+
+    final columns = await db.rawQuery('pragma table_info(exercise_logs)');
+    final hasTitle = columns.any(
+      (column) => column['name'] == 'exercise_title',
+    );
+    if (!hasTitle) {
+      await db.execute(
+        'alter table exercise_logs add column exercise_title text',
+      );
+    }
+
+    await db.execute(
+      'create index if not exists idx_exercise_logs_user_completed on exercise_logs(user_email, completed_at_ms desc)',
     );
   }
 
@@ -521,6 +557,72 @@ class LocalDatabase {
     final db = await database;
     await db.delete('posture_samples');
     await db.delete('posture_daily_stats');
+  }
+
+  Future<void> insertExerciseLog({
+    required String userEmail,
+    required String exerciseCode,
+    required String exerciseTitle,
+    required int durationSeconds,
+    DateTime? completedAt,
+  }) async {
+    final db = await database;
+    final normalized = _normalizeEmail(userEmail);
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final completedAtMs = (completedAt ?? DateTime.now())
+        .toUtc()
+        .millisecondsSinceEpoch;
+
+    await upsertUser(email: normalized);
+    await db.insert('exercise_logs', {
+      'user_email': normalized,
+      'exercise_code': exerciseCode,
+      'exercise_title': exerciseTitle,
+      'duration_seconds': durationSeconds,
+      'completed_at_ms': completedAtMs,
+      'created_at_ms': now,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> loadExerciseLogs({
+    required String userEmail,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final db = await database;
+    final where = <String>['user_email = ?'];
+    final args = <Object?>[_normalizeEmail(userEmail)];
+
+    if (from != null) {
+      where.add('completed_at_ms >= ?');
+      args.add(from.toUtc().millisecondsSinceEpoch);
+    }
+    if (to != null) {
+      where.add('completed_at_ms < ?');
+      args.add(to.toUtc().millisecondsSinceEpoch);
+    }
+
+    final rows = await db.query(
+      'exercise_logs',
+      where: where.join(' and '),
+      whereArgs: args,
+      orderBy: 'completed_at_ms desc',
+    );
+
+    return rows
+        .map((row) {
+          return {
+            'id': row['id'],
+            'userEmail': row['user_email'],
+            'exerciseCode': row['exercise_code'],
+            'exerciseTitle': row['exercise_title'],
+            'durationSeconds': row['duration_seconds'],
+            'completedAt': row['completed_at_ms'],
+            'createdAt': row['created_at_ms'],
+            'syncedAt': row['synced_at_ms'],
+          };
+        })
+        .toList(growable: false);
   }
 
   Map<String, dynamic> _sampleToRow(Map<String, dynamic> sample) {

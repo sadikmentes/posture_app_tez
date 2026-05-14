@@ -91,6 +91,7 @@ create table if not exists exercise_logs (
   id bigserial primary key,
   user_id uuid not null references users(id) on delete cascade,
   exercise_code text not null,
+  exercise_title text,
   duration_seconds integer,
   completed_at timestamptz not null,
   created_at timestamptz not null default now()

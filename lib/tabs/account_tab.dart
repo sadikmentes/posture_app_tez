@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:posture_app/services/posture_alert_service.dart';
 import 'package:posture_app/storage.dart' as ls;
 import 'package:posture_app/supabase_backend.dart';
 import 'package:posture_app/ui/modern_background.dart';
@@ -43,6 +44,7 @@ class _AccountTabState extends State<AccountTab> {
   }
 
   Future<void> _logout() async {
+    await PostureAlertService.I.suspend();
     await ls.LocalStorage.logout();
     await Backend.signOut();
     if (!mounted) return;

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -38,6 +38,8 @@ class _PostureThresholds {
 class BleManager {
   BleManager._();
   static final BleManager I = BleManager._();
+
+  static const Duration _liveDataGrace = Duration(seconds: 18);
 
   // Legacy custom UUID kept for backward compatibility.
   static final Guid serviceUuid = Guid('12345678-1234-1234-1234-1234567890ab');
@@ -159,7 +161,7 @@ class BleManager {
     if (_deviceIdle) return true;
     final t = _lastPacketAt;
     if (t == null) return false;
-    return DateTime.now().difference(t) <= const Duration(seconds: 2);
+    return DateTime.now().difference(t) <= _liveDataGrace;
   }
 
   bool get hasPostureData => _hasSmoothed;
@@ -168,29 +170,29 @@ class BleManager {
     switch (_sensitivity) {
       case PostureSensitivity.strict:
         return const _PostureThresholds(
-          goodPitch: 7.0,
-          badPitch: 11.0,
-          goodRoll: 5.0,
-          badRoll: 8.0,
+          goodPitch: 8.0,
+          badPitch: 14.0,
+          goodRoll: 10.0,
+          badRoll: 18.0,
           badConfirm: Duration(milliseconds: 2500),
           goodConfirm: Duration(milliseconds: 2000),
         );
       case PostureSensitivity.balanced:
         return const _PostureThresholds(
-          goodPitch: 8.0,
-          badPitch: 12.0,
-          goodRoll: 6.0,
-          badRoll: 9.0,
-          badConfirm: Duration(milliseconds: 3000),
+          goodPitch: 10.0,
+          badPitch: 16.0,
+          goodRoll: 14.0,
+          badRoll: 22.0,
+          badConfirm: Duration(milliseconds: 3500),
           goodConfirm: Duration(milliseconds: 2000),
         );
       case PostureSensitivity.relaxed:
         return const _PostureThresholds(
-          goodPitch: 9.0,
-          badPitch: 13.0,
-          goodRoll: 7.0,
-          badRoll: 10.0,
-          badConfirm: Duration(milliseconds: 3500),
+          goodPitch: 12.0,
+          badPitch: 18.0,
+          goodRoll: 18.0,
+          badRoll: 28.0,
+          badConfirm: Duration(milliseconds: 4000),
           goodConfirm: Duration(milliseconds: 2500),
         );
     }
@@ -278,24 +280,14 @@ class BleManager {
       final ok = await _calibrateFromFirmware(duration: duration);
       _isCalibrating = false;
       if (ok) {
-        _isCalibrating = true;
-        final appOk = await _calibrateFromIncomingSamples(
-          duration: const Duration(milliseconds: 1200),
-          minimumSamples: 2,
-        );
-        _isCalibrating = false;
-
-        if (appOk) {
-          _finishCalibration('Kalibrasyon tamamlandi');
-          return true;
-        }
-
         _pitchOffset = 0.0;
         _rollOffset = 0.0;
         _finishCalibration('Kalibrasyon tamamlandi (cihaz)');
         return true;
       }
-      _statusCtrl.add('Cihazdan CAL_OK gelmedi, uygulama kalibrasyonu deneniyor...');
+      _statusCtrl.add(
+        'Cihazdan CAL_OK gelmedi, uygulama kalibrasyonu deneniyor...',
+      );
     }
 
     if (_lastRaw == null) {
@@ -315,9 +307,7 @@ class BleManager {
       return false;
     }
 
-    _finishCalibration(
-      'Kalibre edildi (Pitch0= Roll0=)',
-    );
+    _finishCalibration('Kalibre edildi (Pitch0= Roll0=)');
     return true;
   }
 
@@ -414,7 +404,14 @@ class BleManager {
 
   String _normalizeName(String raw) {
     var out = raw.toLowerCase().trim();
-    const map = {'Ã¼': 'u', 'Ã¶': 'o', 'ÄŸ': 'g', 'ÅŸ': 's', 'Ä±': 'i', 'Ã§': 'c'};
+    const map = {
+      'Ã¼': 'u',
+      'Ã¶': 'o',
+      'ÄŸ': 'g',
+      'ÅŸ': 's',
+      'Ä±': 'i',
+      'Ã§': 'c',
+    };
     map.forEach((k, v) => out = out.replaceAll(k, v));
     out = out.replaceAll('-', '_').replaceAll(' ', '_');
     return out;
@@ -707,17 +704,20 @@ class BleManager {
 
     if (token.contains('WAKE')) {
       _deviceIdle = false;
+      _resetAngleSmoothing();
       _statusCtrl.add('Cihaz aktif moda dÃ¶ndÃ¼');
       handled = true;
     }
 
     if (token.contains('BAD_POSTURE')) {
-      _applyFirmwareState(true);
+      _firmwareBad = true;
+      _evaluateStateFromCurrentAngles();
       handled = true;
     }
 
     if (token.contains('GOOD_POSTURE')) {
-      _applyFirmwareState(false);
+      _firmwareBad = false;
+      _evaluateStateFromCurrentAngles();
       handled = true;
     }
 

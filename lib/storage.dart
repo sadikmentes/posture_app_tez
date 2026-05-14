@@ -22,6 +22,8 @@ class LocalStorage {
   static const _kPostureSamples = "metrics.posture.samples.v1";
   static const _kHealthProfile = "user_health_profile.v1";
   static const _kPostureDeviceByEmail = "settings.posture_device.by_email.v1";
+  static const _kExerciseSafetyScreening =
+      "exercise.safety_screening.by_day.v1";
 
   static Future<void> saveUser(Map<String, dynamic> user) async {
     final sp = await SharedPreferences.getInstance();
@@ -493,5 +495,70 @@ class LocalStorage {
     final sp = await SharedPreferences.getInstance();
     await sp.remove(_kPostureSamples);
     await LocalDatabase.I.clearPostureSamples();
+  }
+
+  static Future<Map<String, dynamic>?>
+  loadTodayExerciseSafetyScreening() async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kExerciseSafetyScreening);
+    if (raw == null || raw.isEmpty) return null;
+
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    final today = _todayKey();
+    if (decoded['day']?.toString() != today) return null;
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  static Future<void> saveTodayExerciseSafetyScreening({
+    required bool? hasImportantCondition,
+    required bool? hasRedFlagSymptoms,
+    required bool acknowledgedSafety,
+  }) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(
+      _kExerciseSafetyScreening,
+      jsonEncode({
+        'day': _todayKey(),
+        'hasImportantCondition': hasImportantCondition,
+        'hasRedFlagSymptoms': hasRedFlagSymptoms,
+        'acknowledgedSafety': acknowledgedSafety,
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
+  }
+
+  static String _todayKey() {
+    final now = DateTime.now();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$month-$day';
+  }
+
+  static Future<void> appendExerciseLog({
+    required String exerciseCode,
+    required String exerciseTitle,
+    required int durationSeconds,
+  }) async {
+    final email = await getCurrentEmail();
+    await LocalDatabase.I.insertExerciseLog(
+      userEmail: email ?? LocalDatabase.anonymousUser,
+      exerciseCode: exerciseCode,
+      exerciseTitle: exerciseTitle,
+      durationSeconds: durationSeconds,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> loadExerciseLogs({
+    DateTime? from,
+    DateTime? to,
+    String? userEmail,
+  }) async {
+    final email = userEmail ?? await getCurrentEmail();
+    return LocalDatabase.I.loadExerciseLogs(
+      userEmail: email ?? LocalDatabase.anonymousUser,
+      from: from,
+      to: to,
+    );
   }
 }

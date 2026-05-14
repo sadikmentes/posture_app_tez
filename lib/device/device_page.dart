@@ -17,8 +17,7 @@ class _DevicePageState extends State<DevicePage> {
 
   StreamSubscription<String>? _statusSub;
 
-  String _statusText = 'Hazır';
-
+  String _statusText = 'Hazir';
   bool _calibratingUi = false;
   int _countdown = 0;
   int _calibrationSeconds = 4;
@@ -26,12 +25,10 @@ class _DevicePageState extends State<DevicePage> {
   @override
   void initState() {
     super.initState();
-
     _statusSub = ble.statusStream.listen((msg) {
       if (!mounted) return;
-      setState(() => _statusText = msg);
+      setState(() => _statusText = _friendlyBleStatus(msg));
     });
-
     ble.startScan();
   }
 
@@ -42,8 +39,7 @@ class _DevicePageState extends State<DevicePage> {
   }
 
   Future<void> _startCalibration() async {
-    if (_calibratingUi) return;
-    if (ble.connectedDevice == null) return;
+    if (_calibratingUi || ble.connectedDevice == null) return;
 
     setState(() {
       _calibratingUi = true;
@@ -70,8 +66,8 @@ class _DevicePageState extends State<DevicePage> {
       SnackBar(
         content: Text(
           ok
-              ? 'Kalibrasyon tamamlandı. Cihaz CAL_OK gönderdi.'
-              : 'Kalibrasyon başarısız. Bağlantıyı ve veri akışını kontrol et.',
+              ? 'Kalibrasyon tamamlandi.'
+              : 'Kalibrasyon tamamlanamadi. Baglantiyi kontrol et.',
         ),
       ),
     );
@@ -84,7 +80,7 @@ class _DevicePageState extends State<DevicePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cihazım'),
+        title: const Text('Cihazim'),
         actions: [
           IconButton(
             onPressed: () => ble.startScan(),
@@ -95,7 +91,7 @@ class _DevicePageState extends State<DevicePage> {
             IconButton(
               onPressed: () => ble.disconnect(),
               icon: const Icon(Icons.link_off_rounded),
-              tooltip: 'Bağlantıyı kes',
+              tooltip: 'Baglantiyi kes',
             ),
         ],
       ),
@@ -108,9 +104,7 @@ class _DevicePageState extends State<DevicePage> {
                 child: ListTile(
                   leading: const Icon(Icons.bluetooth_connected),
                   title: Text(
-                    connected == null
-                        ? 'Bağlı cihaz yok'
-                        : 'Bağlı: Postur Düzeltici',
+                    connected == null ? 'Bagli cihaz yok' : 'Cihaz bagli',
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   subtitle: Text(_statusText),
@@ -132,7 +126,7 @@ class _DevicePageState extends State<DevicePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Kalibrasyon Ayarları',
+                          'Kalibrasyon Ayarlari',
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 16,
@@ -140,7 +134,7 @@ class _DevicePageState extends State<DevicePage> {
                         ),
                         const SizedBox(height: 10),
                         const Text(
-                          'Kalibrasyon süresi',
+                          'Kalibrasyon suresi',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 6),
@@ -156,7 +150,7 @@ class _DevicePageState extends State<DevicePage> {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'Skor hassasiyeti (uygulama)',
+                          'Skor hassasiyeti',
                           style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 6),
@@ -164,7 +158,7 @@ class _DevicePageState extends State<DevicePage> {
                           segments: const [
                             ButtonSegment<PostureSensitivity>(
                               value: PostureSensitivity.strict,
-                              label: Text('Sıkı'),
+                              label: Text('Siki'),
                             ),
                             ButtonSegment<PostureSensitivity>(
                               value: PostureSensitivity.balanced,
@@ -182,26 +176,35 @@ class _DevicePageState extends State<DevicePage> {
                           },
                         ),
                         const SizedBox(height: 12),
-                        ElevatedButton.icon(
-                          onPressed: _calibratingUi ? null : _startCalibration,
-                          icon: const Icon(Icons.tune),
-                          label: Text(
-                            _calibratingUi
-                                ? 'Kalibre ediliyor... ($_countdown)'
-                                : 'Kalibre Et',
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _calibratingUi
+                                ? null
+                                : _startCalibration,
+                            icon: const Icon(Icons.tune),
+                            label: Text(
+                              _calibratingUi
+                                  ? 'Kalibre ediliyor ($_countdown)'
+                                  : 'Kalibre Et',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: () {
-                            ble.resetCalibration();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Kalibrasyon sıfırlandı.'),
-                              ),
-                            );
-                          },
-                          child: const Text('Kalibrasyonu sıfırla'),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              ble.resetCalibration();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Kalibrasyon sifirlandi.'),
+                                ),
+                              );
+                            },
+                            child: const Text('Kalibrasyonu sifirla'),
+                          ),
                         ),
                       ],
                     ),
@@ -213,7 +216,7 @@ class _DevicePageState extends State<DevicePage> {
                 FilledButton.icon(
                   onPressed: () => ble.startScan(),
                   icon: const Icon(Icons.search_rounded),
-                  label: const Text('Cihazları Tara'),
+                  label: const Text('Cihazlari Tara'),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -230,7 +233,7 @@ class _DevicePageState extends State<DevicePage> {
                         child: Padding(
                           padding: EdgeInsets.all(16),
                           child: Text(
-                            'Postur_Duzeltici görünmüyor. Cihazın reklamda olduğunu kontrol et.',
+                            'Postur_Duzeltici gorunmuyor. Cihazin acik oldugunu kontrol et.',
                           ),
                         ),
                       );
@@ -248,7 +251,7 @@ class _DevicePageState extends State<DevicePage> {
                                 ),
                                 title: Text(
                                   r.advertisementData.advName.trim().isEmpty
-                                      ? 'Postur Düzeltici'
+                                      ? 'Postur Duzeltici'
                                       : r.advertisementData.advName.trim(),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
@@ -256,7 +259,7 @@ class _DevicePageState extends State<DevicePage> {
                                 ),
                                 trailing: FilledButton(
                                   onPressed: () => ble.connect(r),
-                                  child: const Text('Bağlan'),
+                                  child: const Text('Baglan'),
                                 ),
                               ),
                             ),
@@ -272,4 +275,27 @@ class _DevicePageState extends State<DevicePage> {
       ),
     );
   }
+}
+
+String _friendlyBleStatus(String raw) {
+  final text = raw.toLowerCase();
+  if (text.contains('komut') || text.contains('command')) {
+    return 'Cihazla iletisim kuruldu';
+  }
+  if (text.contains('cal_ok') || text.contains('kalibrasyon tamam')) {
+    return 'Kalibrasyon tamamlandi';
+  }
+  if (text.contains('kalibrasyon baslat')) {
+    return 'Kalibrasyon baslatildi';
+  }
+  if (text.contains('kalibrasyon') && text.contains('beklen')) {
+    return 'Kalibrasyon icin veri bekleniyor';
+  }
+  if (text.contains('bagland') || text.contains('baä')) return 'Cihaz bagli';
+  if (text.contains('haz')) return 'Cihaz hazir';
+  if (text.contains('bekleme')) return 'Cihaz bekleme modunda';
+  if (text.length > 48 || text.contains('=') || text.contains('12345678')) {
+    return 'Cihaz bagli';
+  }
+  return raw;
 }

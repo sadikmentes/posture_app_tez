@@ -128,9 +128,10 @@ class PostureScoreStabilizer {
 }
 
 class PostureScoreCalculator {
-  static const double defaultRollThreshold = 15.0;
-  static const double sensitiveRollThreshold = 10.0;
-  static const double pitchWarningThreshold = 20.0;
+  static const double rollScoreWeight = 0.45;
+  static const double defaultRollThreshold = 26.0;
+  static const double sensitiveRollThreshold = 20.0;
+  static const double pitchWarningThreshold = 24.0;
 
   final double currentPitch;
   final double currentRoll;
@@ -150,7 +151,10 @@ class PostureScoreCalculator {
     final deltaPitch = _angularDistance(currentPitch, calibratedPitch);
     final deltaRoll = _angularDistance(currentRoll, calibratedRoll);
 
-    final d = math.sqrt((deltaPitch * deltaPitch) + (deltaRoll * deltaRoll));
+    final weightedRoll = deltaRoll * rollScoreWeight;
+    final d = math.sqrt(
+      (deltaPitch * deltaPitch) + (weightedRoll * weightedRoll),
+    );
 
     final score = _scoreForDeviation(d).round().clamp(0, 100);
     final pitchWarning = deltaPitch > pitchWarningThreshold;
@@ -175,55 +179,55 @@ class PostureScoreCalculator {
   }
 
   double _scoreForDeviation(double d) {
-    if (d <= 5.0) {
+    if (d <= 8.0) {
       return 100.0;
     }
-    if (d <= 10.0) {
-      return 100.0 - 5.0 * ((d - 5.0) / 5.0);
+    if (d <= 15.0) {
+      return 100.0 - 5.0 * ((d - 8.0) / 7.0);
     }
-    if (d <= 20.0) {
-      return 95.0 - 15.0 * ((d - 10.0) / 10.0);
+    if (d <= 30.0) {
+      return 95.0 - 15.0 * ((d - 15.0) / 15.0);
     }
-    if (d <= 40.0) {
-      return 80.0 - 20.0 * ((d - 20.0) / 20.0);
+    if (d <= 50.0) {
+      return 80.0 - 20.0 * ((d - 30.0) / 20.0);
     }
-    if (d <= 60.0) {
-      return 60.0 - 30.0 * ((d - 40.0) / 20.0);
+    if (d <= 70.0) {
+      return 60.0 - 30.0 * ((d - 50.0) / 20.0);
     }
 
-    return math.max(0.0, 30.0 - 30.0 * ((d - 60.0) / 30.0));
+    return math.max(0.0, 30.0 - 30.0 * ((d - 70.0) / 30.0));
   }
 
   _DeviationRange _rangeForDeviation(double d) {
-    if (d <= 5.0) {
+    if (d <= 8.0) {
       return const _DeviationRange(
         postureComment: 'İhmal edilebilir sapma',
         systemBehavior: 'Uyarı yok',
         fallbackWarningText: 'Uyarı yok',
       );
     }
-    if (d <= 10.0) {
+    if (d <= 15.0) {
       return const _DeviationRange(
         postureComment: 'Çok hafif sapma',
         systemBehavior: 'Sadece kayıt',
         fallbackWarningText: 'Çok hafif sapma',
       );
     }
-    if (d <= 20.0) {
+    if (d <= 30.0) {
       return const _DeviationRange(
         postureComment: 'Hafif postür bozulması',
         systemBehavior: 'Süreklilik varsa pasif uyarı',
         fallbackWarningText: 'Hafif postür bozulması',
       );
     }
-    if (d <= 40.0) {
+    if (d <= 50.0) {
       return const _DeviationRange(
         postureComment: 'Belirgin postür bozulması',
         systemBehavior: 'Düzeltme uyarısı',
         fallbackWarningText: 'Belirgin postür bozulması',
       );
     }
-    if (d <= 60.0) {
+    if (d <= 70.0) {
       return const _DeviationRange(
         postureComment: 'Kötü postür',
         systemBehavior: 'Güçlü uyarı',

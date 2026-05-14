@@ -14,22 +14,15 @@ class StatusTab extends StatefulWidget {
 class _StatusTabState extends State<StatusTab> {
   final ble = BleManager.I;
 
-  StreamSubscription<String>? _statusSub;
   StreamSubscription<Angles>? _anglesSub;
   StreamSubscription<PostureState>? _postureSub;
 
-  String _statusText = 'Hazir';
   PostureState _state = PostureState.neutral;
 
   @override
   void initState() {
     super.initState();
     _state = ble.postureState;
-
-    _statusSub = ble.statusStream.listen((msg) {
-      if (!mounted) return;
-      setState(() => _statusText = msg);
-    });
 
     _anglesSub = ble.anglesStream.listen((_) {
       if (!mounted) return;
@@ -44,7 +37,6 @@ class _StatusTabState extends State<StatusTab> {
 
   @override
   void dispose() {
-    _statusSub?.cancel();
     _anglesSub?.cancel();
     _postureSub?.cancel();
     super.dispose();
@@ -74,6 +66,14 @@ class _StatusTabState extends State<StatusTab> {
       case PostureState.severe:
         return const Color(0xFFE65050);
     }
+  }
+
+  Color _displayColor(PostureState state, int? score, bool hasLiveState) {
+    if (!hasLiveState || score == null) return _stateColor(state);
+    if (score >= 90) return const Color(0xFF15B88E);
+    if (score >= 75) return const Color(0xFFF5A623);
+    if (score >= 60) return const Color(0xFFFF8A5B);
+    return const Color(0xFFE65050);
   }
 
   String _stateTitle(PostureState state) {
@@ -108,7 +108,12 @@ class _StatusTabState extends State<StatusTab> {
     final isConnected = connected != null;
     final hasLiveState = ble.hasPostureData && ble.hasLiveData;
     final displayState = isConnected ? _state : PostureState.neutral;
-    final displayColor = _stateColor(displayState);
+    final postureScore = isConnected && hasLiveState ? ble.postureScore : null;
+    final displayColor = _displayColor(
+      displayState,
+      postureScore,
+      hasLiveState,
+    );
     final displayTitle = !isConnected
         ? 'Cihaz bagli degil'
         : hasLiveState
@@ -124,7 +129,6 @@ class _StatusTabState extends State<StatusTab> {
         : hasLiveState
         ? ble.postureSummary
         : 'Canli veri bekleniyor';
-    final postureScore = isConnected && hasLiveState ? ble.postureScore : null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Durumum')),
@@ -166,14 +170,15 @@ class _StatusTabState extends State<StatusTab> {
               const SizedBox(height: 12),
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.bluetooth_connected),
+                  leading: Icon(
+                    isConnected
+                        ? Icons.bluetooth_connected
+                        : Icons.bluetooth_disabled,
+                  ),
                   title: Text(
-                    connected == null
-                        ? 'Cihaz bagli degil'
-                        : 'Bagli: ${connected.remoteId.str}',
+                    connected == null ? 'Cihaz bagli degil' : 'Cihaz bagli',
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  subtitle: Text(_statusText),
                 ),
               ),
               const SizedBox(height: 12),
@@ -208,6 +213,32 @@ class _StatusTabState extends State<StatusTab> {
       ),
     );
   }
+}
+
+// ignore: unused_element
+String _friendlyBleStatus(String raw) {
+  final text = raw.toLowerCase();
+  if (text.contains('komut') || text.contains('command')) {
+    return 'Cihazla iletisim kuruldu';
+  }
+  if (text.contains('cal_ok') || text.contains('kalibrasyon tamam')) {
+    return 'Kalibrasyon tamamlandi';
+  }
+  if (text.contains('kalibrasyon baslat')) {
+    return 'Kalibrasyon baslatildi';
+  }
+  if (text.contains('kalibrasyon') && text.contains('beklen')) {
+    return 'Kalibrasyon icin veri bekleniyor';
+  }
+  if (text.contains('bagland') || text.contains('baä')) {
+    return 'Cihaz bagli';
+  }
+  if (text.contains('haz')) return 'Cihaz hazir';
+  if (text.contains('bekleme')) return 'Cihaz bekleme modunda';
+  if (text.length > 48 || text.contains('=') || text.contains('12345678')) {
+    return 'Cihaz bagli';
+  }
+  return raw;
 }
 
 class _PostureScoreCard extends StatelessWidget {

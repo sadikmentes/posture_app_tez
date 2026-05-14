@@ -57,6 +57,13 @@ class PostureAlertService {
     final badSince = _badSince;
     if (badSince == null) return;
 
+    final loggedIn = await ls.LocalStorage.isLoggedIn();
+    final accountType = await ls.LocalStorage.getCurrentAccountType();
+    if (!loggedIn || accountType != 'user') {
+      await suspend();
+      return;
+    }
+
     final alertsEnabled = await ls.LocalStorage.getNotifyPostureAlerts();
     if (!alertsEnabled) return;
 
@@ -133,6 +140,11 @@ class PostureAlertService {
     _alarmSent = false;
     _timer?.cancel();
     _timer = null;
+  }
+
+  Future<void> suspend() async {
+    _resetBadPostureWindow();
+    await _notifications.cancelAll();
   }
 
   Future<void> dispose() async {

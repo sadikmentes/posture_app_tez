@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:posture_app/ble/ble_manager.dart';
 import 'package:posture_app/pages/ai_assistant_page.dart';
 import 'package:posture_app/pages/exercise_page.dart';
+import 'package:posture_app/pages/messages_page.dart';
 import 'package:posture_app/pages/nearby_physiotherapists_page.dart';
 import 'package:posture_app/pages/reports_page.dart';
 import 'package:posture_app/ui/modern_background.dart';
@@ -40,6 +41,26 @@ class _HomeTabState extends State<HomeTab> {
     super.dispose();
   }
 
+  void _openMessages() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MessagesPage()),
+    );
+  }
+
+  PreferredSizeWidget _appBar() {
+    return AppBar(
+      title: const Text('Ana Sayfa'),
+      actions: [
+        IconButton(
+          onPressed: _openMessages,
+          icon: const Icon(Icons.mark_chat_unread_outlined),
+          tooltip: 'Mesajlar',
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -50,7 +71,7 @@ class _HomeTabState extends State<HomeTab> {
 
     if (!widget.hasDevice) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Ana Sayfa')),
+        appBar: _appBar(),
         body: ModernBackground(
           child: SafeArea(
             child: ListView(
@@ -109,7 +130,7 @@ class _HomeTabState extends State<HomeTab> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ana Sayfa')),
+      appBar: _appBar(),
       body: ModernBackground(
         child: SafeArea(
           child: ListView(
@@ -117,8 +138,6 @@ class _HomeTabState extends State<HomeTab> {
             children: [
               _HeaderBanner(connected: connected, score: score, state: state),
               const SizedBox(height: 16),
-
-              // ─── Raporlar + Egzersiz ───
               Row(
                 children: [
                   Expanded(
@@ -149,10 +168,9 @@ class _HomeTabState extends State<HomeTab> {
                 ],
               ),
               const SizedBox(height: 12),
-
               _ActionCard(
-                title: 'Postur Asistani',
-                subtitle: 'AI ile rapor yorumu, mola ve egzersiz onerisi',
+                title: 'Postür Asistanı',
+                subtitle: 'AI ile rapor yorumu, mola ve egzersiz önerisi',
                 icon: Icons.auto_awesome,
                 gradient: const [Color(0xFF7C5CFF), Color(0xFF3D6DFF)],
                 onTap: () => Navigator.push(
@@ -161,8 +179,6 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
               const SizedBox(height: 12),
-
-              // ─── Fizyoterapist ───
               _ActionCard(
                 title: 'Yakın Fizyoterapist',
                 subtitle: 'Konumuna göre yakın merkezler ve online destek',
@@ -176,15 +192,12 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // ─── Anlık durum kartı ───
               _LiveStatusCard(
                 connected: connected,
                 hasData: hasData,
                 score: score,
                 state: state,
               ),
-
               const SizedBox(height: 10),
               Text(
                 'İpucu: Şiddetli ağrı veya uyuşma varsa hekime danış.',
@@ -202,7 +215,6 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-// ── Üst banner ───────────────────────────────────────────────────────────────
 class _NoDeviceHeaderBanner extends StatelessWidget {
   const _NoDeviceHeaderBanner();
 
@@ -243,7 +255,7 @@ class _NoDeviceHeaderBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Cihaz olmadan egzersiz, AI asistan ve destek ozelliklerini kullanabilirsin.',
+                  'Cihaz olmadan egzersiz, AI asistan ve destek özelliklerini kullanabilirsin.',
                   style: TextStyle(color: Color(0xD9FFFFFF)),
                 ),
               ],
@@ -324,7 +336,7 @@ class _HeaderBanner extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   connected
-                      ? 'Sensör bağlı — duruşun izleniyor'
+                      ? 'Sensör bağlı, duruşun izleniyor'
                       : 'Duruşunu izle, raporları gör.',
                   style: const TextStyle(color: Color(0xD9FFFFFF)),
                 ),
@@ -363,7 +375,6 @@ class _HeaderBanner extends StatelessWidget {
   }
 }
 
-// ── Aksiyon kartı ─────────────────────────────────────────────────────────────
 class _ActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -459,7 +470,6 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-// ── Anlık durum kartı ─────────────────────────────────────────────────────────
 class _LiveStatusCard extends StatelessWidget {
   final bool connected;
   final bool hasData;
@@ -561,9 +571,16 @@ class _LiveStatusCard extends StatelessWidget {
     }
 
     final s = state!;
-    final color = _stateColor(s);
+    final stateColor = _stateColor(s);
     final label = _stateLabel(s);
     final scoreVal = score!.clamp(0, 100);
+    final scoreColor = scoreVal >= 90
+        ? const Color(0xFF15B88E)
+        : scoreVal >= 75
+        ? const Color(0xFFF5A623)
+        : scoreVal >= 60
+        ? const Color(0xFFFF8A5B)
+        : const Color(0xFFE65050);
 
     return Card(
       child: Padding(
@@ -573,7 +590,7 @@ class _LiveStatusCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.sensors, color: color, size: 18),
+                Icon(Icons.sensors, color: scoreColor, size: 18),
                 const SizedBox(width: 8),
                 const Text(
                   'Anlık Durum',
@@ -586,13 +603,13 @@ class _LiveStatusCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: color.withAlpha(24),
+                    color: stateColor.withAlpha(24),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     label,
                     style: TextStyle(
-                      color: color,
+                      color: stateColor,
                       fontWeight: FontWeight.w800,
                       fontSize: 12,
                     ),
@@ -614,7 +631,7 @@ class _LiveStatusCard extends StatelessWidget {
                       Text(
                         '${v.round()}',
                         style: TextStyle(
-                          color: color,
+                          color: scoreColor,
                           fontSize: 40,
                           fontWeight: FontWeight.w900,
                           height: 1,
@@ -640,7 +657,7 @@ class _LiveStatusCard extends StatelessWidget {
                       minHeight: 8,
                       value: v / 100,
                       backgroundColor: const Color(0xFFE6EAF2),
-                      color: color,
+                      color: scoreColor,
                     ),
                   ),
                 ],
