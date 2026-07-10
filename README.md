@@ -4,6 +4,7 @@ Entegre cihaz, kullanıcının duruş durumuna ait verileri algılar ve bu veril
 Projenin temel mantığı; fiziksel cihazdan elde edilen verileri dijital ortamda anlamlı hale getirmek, bu verileri kullanıcı dostu bir arayüzle sunmak ve postür farkındalığını artırmaktır. Böylece Postür Proje, özellikle masa başında uzun süre çalışan kişiler, öğrenciler ve duruş sağlığını takip etmek isteyen kullanıcılar için pratik, yenilikçi ve geliştirilebilir bir çözüm sunar.
 
  AŞŞAĞIDAKİ WORD DOSYASINDA BÜTÜN BU PROJENİN SUNUMU BULNMAKTADIR
- 
-[856c9e05-03ac-4b97-8d51-a3427d8d73c3 (2).docx](https://github.com/user-attachments/files/29908047/856c9e05-03ac-4b97-8d51-a3427d8d73c3.2.docx)
+
+ [PosturDuzelticiTezRaporu.docx](https://github.com/user-attachments/files/29908129/PosturDuzelticiTezRaporu.docx)
+
 
